@@ -1,0 +1,31 @@
+# secrets
+backend/.env
+firmware/include/secrets.h
+*.pem
+*.key
+
+# python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
+*.egg-info/
+
+# data
+data/*.db
+data/*.db-journal
+data/audio/
+!data/.gitkeep
+
+# platformio
+firmware/.pio/
+firmware/.vscode/
+
+# os / editor
+.DS_Store
+.idea/
+.vscode/
+
+# media (keep videos out of git; put links in docs/EVIDENCE.md)
+*.mp4
+*.mov

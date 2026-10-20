@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanda Rakshak Dashboard</title>
+<script src="/static/vendor/chart.umd.js"></script>  <!-- vendored: dashboard works with no internet -->
+<style>
+  :root { --navy:#1B2A5C; --orange:#F28C28; --bg:#F4F6FB; --card:#fff; --border:#D9DEEA; --ink:#1F2937; --muted:#6B7280;
+          --green:#2E7D4F; --amber:#C77700; --red:#C0392B; --grey:#6B7280; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: Arial, "Noto Sans Devanagari", sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--navy); color:#fff; padding:14px 20px; display:flex; align-items:center; gap:16px; flex-wrap:wrap; }
+  header h1 { font-size:20px; margin:0; } header h1 span { color:var(--orange); }
+  header select { padding:6px 10px; border-radius:6px; border:0; font-size:14px; }
+  .pill { padding:4px 10px; border-radius:999px; font-size:12px; font-weight:bold; }
+  .sim { background:#FFE9C7; color:#8A4B00; } .live { background:#D6F5E1; color:var(--green); } .off { background:#F9D6D2; color:var(--red); }
+  main { padding:16px; display:grid; gap:14px; grid-template-columns: repeat(12, 1fr); max-width:1280px; margin:0 auto; }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; }
+  .c3 { grid-column: span 3; } .c4 { grid-column: span 4; } .c5 { grid-column: span 5; } .c6 { grid-column: span 6; } .c7 { grid-column: span 7; } .c12 { grid-column: span 12; }
+  @media (max-width: 900px) { .c3,.c4,.c5,.c6,.c7 { grid-column: span 12; } }
+  h2 { font-size:13px; text-transform:uppercase; letter-spacing:.06em; color:var(--muted); margin:0 0 10px; }
+  .big { font-size:40px; font-weight:bold; }
+  .advice { border-radius:12px; padding:16px; color:#fff; }
+  .advice .mr { font-size:22px; font-weight:bold; line-height:1.4; } .advice .en { font-size:15px; opacity:.9; margin-top:8px; }
+  .green { background:var(--green); } .amber { background:var(--amber); } .red { background:var(--red); } .grey { background:var(--grey); }
+  .layers { display:grid; grid-template-columns: repeat(4, 1fr); gap:8px; }
+  .layer { background:var(--bg); border-radius:8px; padding:10px; text-align:center; }
+  .layer b { display:block; font-size:12px; color:var(--muted); } .layer .v { font-size:20px; font-weight:bold; }
+  .muted { color:var(--muted); font-size:12px; }
+  .fan { font-size:28px; font-weight:bold; } .spin { display:inline-block; animation: spin 1s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .reasons li { margin:3px 0; font-size:14px; }
+  .src { font-size:12px; padding:2px 8px; border-radius:6px; background:#E8EBF5; color:var(--navy); font-weight:bold; }
+  .src.fallback, .src.cache { background:#FFE9C7; color:#8A4B00; }
+  canvas { max-height:260px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>कांदा रक्षक <span>Kanda Rakshak</span></h1>
+  <select id="dev"></select>
+  <span id="status" class="pill">—</span>
+  <span id="simflag" class="pill sim" style="display:none">SIMULATED DATA — not a real sensor</span>
+  <span class="muted" style="color:#C9D2EC" id="updated"></span>
+</header>
+<main>
+  <section class="c7"><div id="advice" class="advice grey"><div class="mr">—</div><div class="en">Waiting for data…</div></div>
+    <div class="muted" id="notif" style="margin-top:6px"></div></section>
+  <section class="card c5"><h2>Mandi price (Govt data)</h2>
+    <div class="big" id="price">—</div>
+    <div id="pmeta" class="muted"></div></section>
+
+  <section class="card c3"><h2>Rot risk</h2><div class="big" id="score">—</div><div id="level" class="muted"></div>
+    <ul class="reasons" id="reasons"></ul></section>
+  <section class="card c6"><h2>Inside the heap</h2><div class="layers" id="layers"></div>
+    <div class="muted" id="gas" style="margin-top:10px"></div></section>
+  <section class="card c3"><h2>Ventilation fan</h2><div class="fan" id="fan">—</div><div class="muted" id="fanmeta"></div>
+    <div class="muted" style="margin-top:8px">Fan decision runs on the device itself, so it keeps working without network.</div></section>
+
+  <section class="card c6"><h2>Humidity by layer (%)</h2><canvas id="chRh"></canvas></section>
+  <section class="card c6"><h2>Rot gas (mV) and risk score</h2><canvas id="chGas"></canvas></section>
+  <section class="card c12"><h2>Temperature by layer (°C)</h2><canvas id="chT"></canvas></section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const IST = s => s ? new Date(s).toLocaleString('en-IN', {timeZone:'Asia/Kolkata'}) : '—';
+const fmt = (v, d=1) => v === null || v === undefined ? '—' : Number(v).toFixed(d);
+let charts = {}, current = null;
+
+function chart(id, datasets, y2=false) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart($(id), { type:'line', data:{ datasets },
+    options:{ animation:false, parsing:false, responsive:true, interaction:{mode:'nearest', intersect:false},
+      scales:{ x:{ type:'linear', ticks:{ callback:v => new Date(v).toLocaleTimeString('en-IN',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit'}) } },
+               ...(y2 ? { y1:{ position:'right', min:0, max:100, grid:{drawOnChartArea:false} } } : {}) },
+      plugins:{ legend:{ labels:{ boxWidth:12 } } } } });
+}
+const series = (rows, key, label, color, axis='y') => ({ label, borderColor:color, backgroundColor:color, yAxisID:axis,
+  pointRadius:0, borderWidth:2, spanGaps:true,
+  data: rows.map(r => ({ x: new Date(r.measured_at).getTime(), y: r[key] })) });
+
+async function loadDevices() {
+  const list = await (await fetch('/api/v1/devices')).json();
+  const sel = $('dev'); const prev = sel.value;
+  sel.innerHTML = list.map(d => `<option value="${d.device_id}">${d.device_id}${d.simulated ? ' (SIMULATED)' : ''}</option>`).join('');
+  if (prev && list.some(d => d.device_id === prev)) sel.value = prev;
+  else { const real = list.find(d => !d.simulated); if (real) sel.value = real.device_id; }
+  current = sel.value;
+}
+
+async function refresh() {
+  if (!current) { await loadDevices(); if (!current) return; }
+  const r = await fetch(`/api/v1/devices/${current}/latest`); if (!r.ok) return;
+  const d = await r.json();
+  $('simflag').style.display = d.simulated ? '' : 'none';
+  const ageS = (Date.now() - new Date(d.received_at).getTime()) / 1000;
+  $('status').className = 'pill ' + (ageS < 120 ? 'live' : 'off');
+  $('status').textContent = ageS < 120 ? 'ONLINE' : `OFFLINE ${Math.round(ageS/60)} min`;
+  $('updated').textContent = 'Last reading ' + IST(d.measured_at);
+
+  $('advice').className = 'advice ' + d.advice.severity;
+  $('advice').innerHTML = `<div class="mr">${d.advice.text_mr}</div><div class="en">${d.advice.text_en}</div>`;
+  $('notif').textContent = d.last_notification ? `Last message sent ${IST(d.last_notification.sent_at)} via ${d.last_notification.channel}` : 'No message sent yet';
+
+  if (d.price) {
+    $('price').textContent = `₹${Math.round(d.price.modal)}/q`;
+    const tr = d.price.trend_pct === null || d.price.trend_pct === undefined ? '' : ` · ${d.price.trend_pct > 0 ? '+' : ''}${d.price.trend_pct}% vs 7-day avg`;
+    $('pmeta').innerHTML = `${d.price.market}${d.price.variety ? ' · ' + d.price.variety : ''} · arrival ${d.price.arrival_date || 'n/a'}${tr}<br>
+      <span class="src ${d.price.source}">source: ${d.price.source}</span>`;
+  } else { $('price').textContent = '—'; $('pmeta').textContent = 'No price available'; }
+
+  $('score').textContent = fmt(d.risk.score, 0);
+  $('level').textContent = `${d.risk.level}${d.risk.worst_layer ? ' · worst: ' + d.risk.worst_layer + ' layer' : ''}`;
+  $('reasons').innerHTML = d.risk.reasons.map(x => `<li>${x}</li>`).join('');
+
+  const names = {top:'TOP', mid:'MIDDLE', bot:'BOTTOM', amb:'OUTSIDE'};
+  $('layers').innerHTML = Object.entries(names).map(([k, n]) =>
+    `<div class="layer"><b>${n}</b><span class="v">${fmt(d.layers[k].t)}°C</span><br>${fmt(d.layers[k].rh, 0)}% RH</div>`).join('');
+  $('gas').textContent = `MQ-135 ${fmt(d.gas.mq135_mv,0)} mV (fresh baseline ${fmt(d.gas.mq135_base_mv,0)}) · MQ-136 ${fmt(d.gas.mq136_mv,0)} mV (baseline ${fmt(d.gas.mq136_base_mv,0)})`;
+
+  $('fan').innerHTML = d.fan_on ? '<span class="spin">✳</span> ON' : 'OFF';
+  $('fanmeta').textContent = `mode: ${({A:'automatic',M:'manual',R:'remote override'})[d.fan_mode] || d.fan_mode}`;
+
+  const h = await (await fetch(`/api/v1/devices/${current}/history?hours=48`)).json();
+  const rows = h.rows;
+  chart('chRh', [series(rows,'top_rh','Top','#1B2A5C'), series(rows,'mid_rh','Middle','#F28C28'),
+                 series(rows,'bot_rh','Bottom','#C0392B'), series(rows,'amb_rh','Outside','#9AA3B5')]);
+  chart('chT',  [series(rows,'top_t','Top','#1B2A5C'), series(rows,'mid_t','Middle','#F28C28'),
+                 series(rows,'bot_t','Bottom','#C0392B'), series(rows,'amb_t','Outside','#9AA3B5')]);
+  chart('chGas',[series(rows,'mq135','MQ-135 (mV)','#2E7D4F'), series(rows,'mq136','MQ-136 (mV)','#7A4FD3'),
+                 series(rows,'risk_score','Risk score (0-100)','#C0392B','y1')], true);
+}
+
+$('dev').addEventListener('change', e => { current = e.target.value; refresh(); });
+(async () => { await loadDevices(); await refresh(); setInterval(refresh, 5000); setInterval(loadDevices, 30000); })();
+</script>
+</body>
+</html>
