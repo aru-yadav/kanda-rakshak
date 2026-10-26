@@ -74,8 +74,8 @@ def decide(level: str, price: Optional[dict], worst_layer: Optional[str] = None)
             )
         return Advice(
             "VENTILATE",
-            f"कांद्यात ओलावा/उष्णता वाढत आहे. पंखे चालू आहेत. आज एकदा कांदा तपासा.{pmr}",
-            f"Moisture/heat is rising in the heap. Fans are running. Check the onions once today.{pen}",
+            f"कांद्यात ओलावा/उष्णता वाढत आहे. बाहेरची हवा कोरडी असताना पंखा आपोआप चालेल. आज एकदा कांदा तपासा.{pmr}",
+            f"Moisture/heat is rising in the heap. The fan runs automatically when outside air is drier. Check the onions once today.{pen}",
             "amber",
         )
 

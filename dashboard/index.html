@@ -34,10 +34,16 @@
   .src { font-size:12px; padding:2px 8px; border-radius:6px; background:#E8EBF5; color:var(--navy); font-weight:bold; }
   .src.fallback, .src.cache { background:#FFE9C7; color:#8A4B00; }
   canvas { max-height:260px; }
+  nav.tabs a { color:#C9D2EC; text-decoration:none; font-size:14px; margin-right:14px; } nav.tabs a.on { color:#fff; font-weight:bold; border-bottom:2px solid var(--orange); }
+  .ctl { grid-column: span 12; display:flex; flex-wrap:wrap; gap:8px; align-items:center; background:#FFF6E9; border:1px dashed #E5B66C; border-radius:12px; padding:10px 14px; }
+  .ctl b { font-size:12px; color:#8A4B00; text-transform:uppercase; letter-spacing:.06em; margin-right:4px; }
+  .ctl button { font:inherit; font-size:13px; border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 12px; cursor:pointer; }
+  .ctl button.on { background:var(--navy); color:#fff; border-color:var(--navy); }
 </style>
 </head>
 <body>
 <header>
+  <nav class="tabs"><a class="on" href="/">Shed</a><a href="/farmer">Farmer app</a><a href="/dept">Department</a></nav>
   <h1>कांदा रक्षक <span>Kanda Rakshak</span></h1>
   <select id="dev"></select>
   <span id="status" class="pill">—</span>
@@ -45,6 +51,13 @@
   <span class="muted" style="color:#C9D2EC" id="updated"></span>
 </header>
 <main>
+  <section class="ctl" id="ctl" style="display:none">
+    <b>Digital twin controls</b>
+    <button data-sc="fresh">Dry, fresh stock</button><button data-sc="humid">Monsoon humidity</button><button data-sc="rot">Rot starting</button>
+    <span style="width:12px"></span>
+    <button id="kitbtn">Kit ON</button><button id="netbtn">Network ON</button><button id="resetbtn">Restart shed</button>
+    <span class="muted">Simulated shed: changes apply within a few seconds.</span>
+  </section>
   <section class="c7"><div id="advice" class="advice grey"><div class="mr">—</div><div class="en">Waiting for data…</div></div>
     <div class="muted" id="notif" style="margin-top:6px"></div></section>
   <section class="card c5"><h2>Mandi price (Govt data)</h2>
@@ -86,14 +99,35 @@ async function loadDevices() {
   sel.innerHTML = list.map(d => `<option value="${d.device_id}">${d.device_id}${d.simulated ? ' (SIMULATED)' : ''}</option>`).join('');
   if (prev && list.some(d => d.device_id === prev)) sel.value = prev;
   else { const real = list.find(d => !d.simulated); if (real) sel.value = real.device_id; }
+  const want = new URLSearchParams(location.search).get('device');
+  if (want && list.some(d => d.device_id === want) && !prev) sel.value = want;
   current = sel.value;
 }
 
+async function ctl(body) {
+  await fetch(`/api/v1/sim/${current}/control`, {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  setTimeout(refresh, 600);
+}
+document.querySelectorAll('[data-sc]').forEach(b => b.addEventListener('click', () => ctl({scenario: b.dataset.sc})));
+let lastCtl = null;
+$('kitbtn').addEventListener('click', () => lastCtl && ctl({kit_on: !lastCtl.kit_on}));
+$('netbtn').addEventListener('click', () => lastCtl && ctl({offline: !lastCtl.offline}));
+$('resetbtn').addEventListener('click', () => ctl({reset: true}));
+async function refreshCtl(sim) {
+  $('ctl').style.display = sim ? '' : 'none';
+  if (!sim) return;
+  const r = await fetch(`/api/v1/sim/${current}/control`); if (!r.ok) return;
+  lastCtl = await r.json();
+  document.querySelectorAll('[data-sc]').forEach(b => b.classList.toggle('on', b.dataset.sc === lastCtl.scenario));
+  $('kitbtn').textContent = lastCtl.kit_on ? 'Kit ON' : 'Kit OFF (traditional chawl)'; $('kitbtn').classList.toggle('on', lastCtl.kit_on);
+  $('netbtn').textContent = lastCtl.offline ? 'Network OFF (offline)' : 'Network ON'; $('netbtn').classList.toggle('on', !lastCtl.offline);
+}
 async function refresh() {
   if (!current) { await loadDevices(); if (!current) return; }
   const r = await fetch(`/api/v1/devices/${current}/latest`); if (!r.ok) return;
   const d = await r.json();
   $('simflag').style.display = d.simulated ? '' : 'none';
+  refreshCtl(d.simulated);
   const ageS = (Date.now() - new Date(d.received_at).getTime()) / 1000;
   $('status').className = 'pill ' + (ageS < 120 ? 'live' : 'off');
   $('status').textContent = ageS < 120 ? 'ONLINE' : `OFFLINE ${Math.round(ageS/60)} min`;

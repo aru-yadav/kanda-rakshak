@@ -16,7 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from . import advisory, rotrisk
 from .config import settings
 from .db import DB
-from .models import FanCommand, ReadingIn
+from .models import DeviceMeta, FanCommand, ReadingIn, SimControl
 from .notify import Notifier
 from .price import PriceService
 
@@ -102,7 +102,12 @@ def ingest(r: ReadingIn, background: BackgroundTasks, x_device_token: Optional[s
     if r.age_s < 300:
         price = prices.current()
         adv = advisory.decide(risk.level, price, risk.worst_layer)
-        if notifier.should_send(r.device_id, adv):
+        allowed = not settings.notify_devices or r.device_id in settings.notify_devices
+        # debounce: only message the farmer once the risk level has held for 3 readings in a row
+        recent = [x["risk_level"] for x in db.query(
+            "SELECT risk_level FROM readings WHERE device_id=? ORDER BY id DESC LIMIT 3", (r.device_id,))]
+        stable = len(recent) == 3 and len(set(recent)) == 1
+        if allowed and stable and notifier.should_send(r.device_id, adv):
             background.add_task(notifier.send, r.device_id, adv, is_sim(r.device_id))
 
     mode, ttl = _override(r.device_id)
@@ -178,6 +183,118 @@ def price(refresh: bool = False):
     if not p:
         raise HTTPException(503, "no price available: set DATAGOV_API_KEY or PRICE_FALLBACK_MODAL")
     return p
+
+
+# ------------------------------------------------------------------ digital twin (SIM-* devices only)
+def _require_sim(device_id: str) -> None:
+    if not is_sim(device_id):
+        raise HTTPException(400, "simulation endpoints only accept SIM-* devices")
+
+
+@app.post("/api/v1/sim/register")
+def sim_register(meta: DeviceMeta, x_device_token: Optional[str] = Header(default=None)):
+    require(x_device_token, settings.device_token)
+    _require_sim(meta.device_id)
+    db.execute("INSERT OR REPLACE INTO device_meta(device_id, farmer, village, taluka, lat, lon, tonnes, crop) VALUES (?,?,?,?,?,?,?,?)",
+               (meta.device_id, meta.farmer, meta.village, meta.taluka, meta.lat, meta.lon, meta.tonnes, meta.crop))
+    db.execute("INSERT OR IGNORE INTO sim_control(device_id) VALUES (?)", (meta.device_id,))
+    return {"ok": True}
+
+
+def _control(device_id: str) -> dict:
+    rows = db.query("SELECT scenario, offline, kit_on, reset FROM sim_control WHERE device_id=?", (device_id,))
+    if not rows:
+        return {"scenario": "humid", "offline": False, "kit_on": True, "reset": False}
+    r = rows[0]
+    return {"scenario": r["scenario"], "offline": bool(r["offline"]), "kit_on": bool(r["kit_on"]), "reset": bool(r["reset"])}
+
+
+@app.get("/api/v1/sim/{device_id}/control")
+def sim_get_control(device_id: str, ack_reset: bool = False):
+    _require_sim(device_id)
+    c = _control(device_id)
+    if ack_reset and c["reset"]:
+        db.execute("UPDATE sim_control SET reset=0 WHERE device_id=?", (device_id,))
+    return c
+
+
+@app.post("/api/v1/sim/{device_id}/control")
+def sim_set_control(device_id: str, cmd: SimControl, x_admin_token: Optional[str] = Header(default=None)):
+    _require_sim(device_id)
+    if not settings.demo_mode:
+        require(x_admin_token, settings.admin_token)
+    db.execute("INSERT OR IGNORE INTO sim_control(device_id) VALUES (?)", (device_id,))
+    for field in ("scenario", "offline", "kit_on", "reset"):
+        v = getattr(cmd, field)
+        if v is not None:
+            db.execute(f"UPDATE sim_control SET {field}=? WHERE device_id=?",  # field is from a fixed whitelist
+                       (int(v) if isinstance(v, bool) else v, device_id))
+    if cmd.reset:  # wipe this shed's history so the demo restarts cleanly
+        db.execute("DELETE FROM readings WHERE device_id=?", (device_id,))
+        db.execute("DELETE FROM notifications WHERE device_id=?", (device_id,))
+    return _control(device_id)
+
+
+@app.get("/api/v1/fleet")
+def fleet():
+    out = []
+    devs = db.query("SELECT device_id, MAX(received_at) AS last_seen FROM readings GROUP BY device_id")
+    metas = {m["device_id"]: dict(m) for m in db.query("SELECT * FROM device_meta")}
+    price = prices.current()
+    for d in devs:
+        rows = db.query("SELECT * FROM readings WHERE device_id=? ORDER BY measured_at DESC LIMIT 1", (d["device_id"],))
+        row = rows[0]
+        layers, gas = _layers_gas(row)
+        risk = rotrisk.compute(layers, gas)
+        adv = advisory.decide(risk.level, price, risk.worst_layer)
+        age = (now_utc() - datetime.fromisoformat(d["last_seen"])).total_seconds()
+        m = metas.get(d["device_id"], {})
+        out.append({"device_id": d["device_id"], "simulated": is_sim(d["device_id"]), "online": age < 45,
+                    "last_seen": d["last_seen"], "farmer": m.get("farmer"), "village": m.get("village"),
+                    "taluka": m.get("taluka"), "lat": m.get("lat"), "lon": m.get("lon"), "tonnes": m.get("tonnes"),
+                    "crop": m.get("crop") or "onion", "risk_score": risk.score, "risk_level": risk.level,
+                    "worst_layer": risk.worst_layer, "fan_on": bool(row["fan_on"]), "action": adv.action,
+                    "severity": adv.severity, "control": _control(d["device_id"]) if is_sim(d["device_id"]) else None})
+    order = {"ROT": 0, "WATCH": 1, "UNKNOWN": 2, "SAFE": 3}
+    out.sort(key=lambda x: (order.get(x["risk_level"], 9), -x["risk_score"]))
+    return {"price": price, "devices": out}
+
+
+@app.get("/api/v1/devices/{device_id}/messages")
+def messages(device_id: str, limit: int = 10):
+    rows = db.query("SELECT sent_at, action, text_mr, text_en, channel FROM notifications WHERE device_id=? "
+                    "ORDER BY id DESC LIMIT ?", (device_id, max(1, min(limit, 50))))
+    return [dict(r) for r in rows]
+
+
+AUDIO_DIR = Path(settings.db_path).parent / "audio"
+
+
+@app.get("/api/v1/devices/{device_id}/voice.mp3")
+def voice(device_id: str):
+    """Marathi voice of today's advice (gTTS, cached). Production would use Bhashini TTS."""
+    import hashlib
+    data = latest(device_id)
+    text = data["advice"]["text_mr"]
+    AUDIO_DIR.mkdir(parents=True, exist_ok=True)
+    f = AUDIO_DIR / (hashlib.sha1(text.encode()).hexdigest()[:16] + ".mp3")
+    if not f.exists():
+        try:
+            from gtts import gTTS
+            gTTS(text=text, lang="mr").save(str(f))
+        except Exception as e:  # no internet / gTTS blocked
+            raise HTTPException(503, f"voice unavailable: {e}")
+    return FileResponse(f, media_type="audio/mpeg")
+
+
+@app.get("/farmer")
+def farmer_page():
+    return FileResponse(DASHBOARD / "farmer.html")
+
+
+@app.get("/dept")
+def dept_page():
+    return FileResponse(DASHBOARD / "dept.html")
 
 
 @app.get("/")

@@ -43,6 +43,9 @@ Full plan: `docs/PLAN.md`. Rules for Claude Code: `CLAUDE.md`.
 
 Department of CSE, MIT ADT University, Pune.
 
+## Software demo (no hardware needed)
+`./scripts/demo.sh` starts the backend plus a digital twin of 8 simulated sheds. Then open `/`, `/farmer` and `/dept`. Details and video script: `docs/SOFTWARE_DEMO.md`.
+
 ## Start with Claude Code
 Read `docs/CLAUDE_CODE_PLAYBOOK.md`: exact prompts, session by session, from git init to submission.
 

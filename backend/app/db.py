@@ -24,6 +24,14 @@ CREATE TABLE IF NOT EXISTS prices (
 CREATE TABLE IF NOT EXISTS overrides (
   device_id TEXT PRIMARY KEY, mode TEXT NOT NULL, until_utc TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS device_meta (
+  device_id TEXT PRIMARY KEY, farmer TEXT, village TEXT, taluka TEXT,
+  lat REAL, lon REAL, tonnes REAL, crop TEXT
+);
+CREATE TABLE IF NOT EXISTS sim_control (
+  device_id TEXT PRIMARY KEY, scenario TEXT NOT NULL DEFAULT 'humid',
+  offline INTEGER NOT NULL DEFAULT 0, kit_on INTEGER NOT NULL DEFAULT 1, reset INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   device_id TEXT NOT NULL, sent_at TEXT NOT NULL, action TEXT NOT NULL,

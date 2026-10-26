@@ -1,0 +1,518 @@
+<title>Kanda Rakshak 3D Simulator</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rozha+One&family=Mukta:wght@400;600;700&family=IBM+Plex+Mono:wght@400;600&display=swap">
+<style>
+/* Layout: a working instrument bench. 3D shed on the left, live readouts + phone on the right, the 4-step loop underneath. */
+:root {
+  --bg: #EEF1F4; --panel: #FFFFFF; --ink: #1D2230; --muted: #5B6272; --line: #D6DBE3;
+  --onion: #8E2C48; --onion-soft: #F6E3E8; --safe: #2E7D4F; --watch: #B86E00; --rot: #B3261E; --grey: #6B7280;
+  --scene: #DCE3EA; --phone: #10141C; --phone-ink: #F2F4F7; --chip: #E6EAF0;
+  --f-display: "Rozha One", "Mukta", Georgia, serif;
+  --f-body: "Mukta", "Noto Sans Devanagari", system-ui, sans-serif;
+  --f-mono: "IBM Plex Mono", ui-monospace, Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12151C; --panel: #1A1F29; --ink: #E8EBF1; --muted: #9AA3B5; --line: #2A3140;
+  --onion: #E07A95; --onion-soft: #3A2129; --safe: #5CC48A; --watch: #F0A53A; --rot: #FF6B5E; --grey: #9AA3B5;
+  --scene: #1B222E; --phone: #05070A; --phone-ink: #F2F4F7; --chip: #242B38; color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #12151C; --panel: #1A1F29; --ink: #E8EBF1; --muted: #9AA3B5; --line: #2A3140;
+  --onion: #E07A95; --onion-soft: #3A2129; --safe: #5CC48A; --watch: #F0A53A; --rot: #FF6B5E; --grey: #9AA3B5;
+  --scene: #1B222E; --phone: #05070A; --phone-ink: #F2F4F7; --chip: #242B38; color-scheme: dark }
+
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.45; margin: 0;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); padding-block: 16px 28px; }
+.wrap { max-width: 1320px; margin: 0 auto; display: grid; gap: 14px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { font-family: var(--f-display); font-weight: 400; font-size: clamp(26px, 4vw, 38px); margin: 0; color: var(--onion); line-height: 1.1; }
+h1 small { font-family: var(--f-body); font-size: 0.5em; color: var(--ink); font-weight: 700; margin-left: 6px; }
+.tag { font-size: 13px; color: var(--muted); }
+.note { font-size: 12px; color: var(--muted); }
+
+.grid { display: grid; grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); gap: 14px; }
+@media (max-width: 960px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+
+.stage { position: relative; background: var(--scene); border-radius: 14px; overflow: hidden; border: 1px solid var(--line); min-height: 380px; aspect-ratio: 16 / 11; max-width: 100%; }
+#cv { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.lbl { position: absolute; transform: translate(-50%, -100%); background: var(--panel); color: var(--ink); border: 1px solid var(--line);
+  font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,.12); }
+.lbl::after { content: ""; position: absolute; left: 50%; top: 100%; width: 1px; height: 10px; background: var(--muted); }
+.hud { position: absolute; left: 12px; top: 12px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.hud span { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 10px; font-family: var(--f-mono); font-size: 12px; }
+.hint { position: absolute; right: 12px; bottom: 10px; font-size: 12px; color: var(--muted); background: var(--panel); padding: 2px 8px; border-radius: 6px; border: 1px solid var(--line); }
+
+.controls { display: grid; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.row b { font-size: 12px; text-transform: uppercase; letter-spacing: .07em; color: var(--muted); min-width: 92px; }
+button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--chip); color: var(--ink); border-radius: 999px; padding: 5px 14px; cursor: pointer; }
+button[aria-pressed="true"] { background: var(--onion); border-color: var(--onion); color: #fff; }
+button:focus-visible { outline: 2px solid var(--onion); outline-offset: 2px; }
+.sw { position: relative; display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 14px; }
+.sw input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.sw i { width: 40px; height: 22px; border-radius: 999px; background: var(--line); position: relative; transition: background .2s; }
+.sw i::after { content: ""; position: absolute; left: 3px; top: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .2s; }
+.sw input:checked + i { background: var(--safe); }
+.sw input:checked + i::after { left: 21px; }
+.sw input:focus-visible + i { outline: 2px solid var(--onion); outline-offset: 2px; }
+
+.side { display: grid; gap: 14px; align-content: start; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 14px; min-width: 0; }
+.card h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
+.layers { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.lay { background: var(--chip); border-radius: 8px; padding: 6px; text-align: center; border-top: 3px solid var(--grey); }
+.lay b { display: block; font-size: 11px; color: var(--muted); letter-spacing: .05em; }
+.lay span { font-family: var(--f-mono); font-size: 13px; font-variant-numeric: tabular-nums; display: block; }
+.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin-top: 10px; }
+.stat { background: var(--chip); border-radius: 8px; padding: 8px; }
+.stat b { display: block; font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: .06em; }
+.stat span { font-family: var(--f-mono); font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.pill { display: inline-block; padding: 1px 10px; border-radius: 999px; color: #fff; font-size: 13px; font-weight: 700; background: var(--grey); }
+.meter { height: 8px; background: var(--chip); border-radius: 999px; overflow: hidden; margin-top: 6px; }
+.meter i { display: block; height: 100%; width: 0; background: var(--safe); transition: width .3s, background .3s; }
+
+.phone { background: var(--phone); color: var(--phone-ink); border-radius: 22px; padding: 12px 12px 14px; border: 1px solid var(--line); }
+.phone .top { display: flex; justify-content: space-between; font-size: 12px; opacity: .75; margin-bottom: 8px; font-family: var(--f-mono); }
+.bubble { background: #1F2A3A; border-radius: 12px 12px 12px 4px; padding: 10px 12px; }
+.bubble .mr { font-size: 16px; font-weight: 600; line-height: 1.45; }
+.bubble .en { font-size: 13px; opacity: .8; margin-top: 6px; }
+.bubble .meta { font-size: 11px; opacity: .6; margin-top: 6px; font-family: var(--f-mono); }
+.queue { margin-top: 8px; font-size: 12px; color: #FFB4A8; }
+
+.steps { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; }
+@media (max-width: 760px) { .steps { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+.step { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 12px; transition: border-color .3s, box-shadow .3s; }
+.step.on { border-color: var(--onion); box-shadow: 0 0 0 3px var(--onion-soft); }
+.step b { font-family: var(--f-display); font-weight: 400; font-size: 20px; color: var(--onion); display: block; }
+.step p { margin: 4px 0 0; font-size: 13px; color: var(--muted); }
+.legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: 12px; color: var(--muted); }
+.legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 5px; vertical-align: -1px; }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>कांदा रक्षक <small>Kanda Rakshak 3D simulator</small></h1>
+    <span class="tag">How the kit protects stored onion inside a kanda chawl: watch → act → tell. Illustrative physics, not field data.</span>
+  </header>
+
+  <div class="controls" role="group" aria-label="Simulation controls">
+    <div class="row"><b>Scenario</b>
+      <button id="sc-fresh" data-sc="fresh" aria-pressed="false">Dry, fresh stock</button>
+      <button id="sc-humid" data-sc="humid" aria-pressed="true">Monsoon humidity</button>
+      <button id="sc-rot" data-sc="rot" aria-pressed="false">Rot starting at bottom</button>
+    </div>
+    <div class="row"><b>Compare</b>
+      <label class="sw"><input type="checkbox" id="kit" checked><i></i><span id="kitlbl">Kanda Rakshak kit ON</span></label>
+      <label class="sw"><input type="checkbox" id="net" checked><i></i><span id="netlbl">Mobile network ON</span></label>
+      <label class="sw"><input type="checkbox" id="lbls" checked><i></i><span>Part labels</span></label>
+    </div>
+    <div class="row"><b>Time</b>
+      <button id="play" aria-pressed="true">Pause</button>
+      <button id="sp1" data-sp="1" aria-pressed="false">1 h/s</button>
+      <button id="sp4" data-sp="4" aria-pressed="true">4 h/s</button>
+      <button id="sp12" data-sp="12" aria-pressed="false">12 h/s</button>
+      <button id="reset">Restart</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <div class="stage" id="stage">
+      <canvas id="cv" aria-label="3D model of a kanda chawl fitted with the Kanda Rakshak kit"></canvas>
+      <div class="labels" id="labels"></div>
+      <div class="hud"><span id="clock">Day 1 · 06:00</span><span id="amb">Outside —</span><span id="loss">Onion affected 0%</span></div>
+      <div class="hint">Drag to rotate · scroll or pinch to zoom</div>
+    </div>
+
+    <div class="side">
+      <div class="card">
+        <h2>Inside the heap (live)</h2>
+        <div class="layers" id="layers"></div>
+        <div class="stats">
+          <div class="stat"><b>Rot gas</b><span id="gas">—</span></div>
+          <div class="stat"><b>Fan</b><span id="fan">—</span></div>
+          <div class="stat"><b>Risk</b><span id="risk">—</span></div>
+        </div>
+        <div style="margin-top:10px"><span class="pill" id="level">—</span> <span class="note" id="reason"></span></div>
+        <div class="meter" aria-hidden="true"><i id="meter"></i></div>
+      </div>
+
+      <div class="card">
+        <h2>What the farmer's phone gets</h2>
+        <div class="phone" aria-live="polite">
+          <div class="top"><span>कांदा रक्षक · KR-01</span><span id="sig">4G ▂▄▆</span></div>
+          <div class="bubble"><div class="mr" id="msgmr">—</div><div class="en" id="msgen"></div><div class="meta" id="msgmeta"></div></div>
+          <div class="queue" id="queue" hidden></div>
+        </div>
+        <p class="note" style="margin:8px 0 0">Price shown is an example (₹2,400/q, Lasalgaon). The real kit pulls the daily modal price from Govt Agmarknet data on data.gov.in.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="steps">
+    <div class="step" id="st1"><b>1 · Install</b><p>3 sensors on a probe stick in the heap, gas pod on top, outside sensor, fan, solar box. No new building.</p></div>
+    <div class="step" id="st2"><b>2 · Watch</b><p>Heat, humidity and rot gas measured at top, middle and bottom every 15 minutes.</p></div>
+    <div class="step" id="st3"><b>3 · Act</b><p>Fan switches on by itself when the heap is humid and outside air is drier. Works with no network.</p></div>
+    <div class="step" id="st4"><b>4 · Tell</b><p>One Marathi instruction on any phone: hold, check, sort or sell, with today's mandi price.</p></div>
+  </div>
+  <div class="legend"><span><i style="background:#9B3B52"></i>Healthy onion</span><span><i style="background:#4E3B26"></i>Rotting onion</span><span><i style="background:#2E7D4F"></i>Layer OK</span><span><i style="background:#B86E00"></i>Watch</span><span><i style="background:#B3261E"></i>Danger</span><span><i style="background:#7FB3E6"></i>Airflow from fan</span></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script>
+(() => {
+"use strict";
+const $ = id => document.getElementById(id);
+const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+const css = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+
+// ------------------------------------------------------------------ simulation model (illustrative)
+const SC = {
+  fresh: { ambRhBase: 55, heapOffset: 6, rot0: 0.00, rotSeedRate: 0.000 },
+  humid: { ambRhBase: 78, heapOffset: 14, rot0: 0.00, rotSeedRate: 0.000 },
+  rot:   { ambRhBase: 66, heapOffset: 12, rot0: 0.15, rotSeedRate: 0.030 },
+};
+const LAYERS = ["top", "mid", "bot"];
+const LAYER_W = { top: 0.45, mid: 0.75, bot: 1.0 };
+const PRICE = { market: "Lasalgaon", modal: 2400 };
+
+const S = {};
+function resetSim() {
+  const sc = SC[scenario];
+  S.t = 6;                      // hours since Day 1 00:00
+  S.rot = sc.rot0;
+  S.rh = { top: sc.ambRhBase + sc.heapOffset - 2, mid: sc.ambRhBase + sc.heapOffset, bot: sc.ambRhBase + sc.heapOffset + 3 };
+  S.fan = false; S.fanChanged = -99;
+  S.lastAction = null; S.queue = []; S.msg = null;
+  S.gasNoise = 0;
+}
+function ambient(t) {
+  const ph = 2 * Math.PI * (t - 9) / 24;                       // warmest ~15:00
+  const sc = SC[scenario];
+  return { t: 27 + 4.5 * Math.sin(ph), rh: Math.min(98, Math.max(30, sc.ambRhBase - 14 * Math.sin(ph))) };
+}
+function step(dt) {
+  const sc = SC[scenario];
+  const amb = ambient(S.t);
+  const heapRhMax = Math.max(S.rh.top, S.rh.mid, S.rh.bot);
+  const heapT = layerTemp("bot", amb);
+  // fan rule — same logic as firmware decideFan()
+  if (kitOn) {
+    const drier = amb.rh < heapRhMax - 5, cooler = amb.t < heapT - 1.5;
+    const wantOn = (heapRhMax > 78 && drier) || (heapT > 30 && cooler);
+    const wantOff = (heapRhMax < 72 || !drier) && (heapT < 28.5 || !cooler);
+    if (!S.fan && wantOn && S.t - S.fanChanged >= 0.5) { S.fan = true; S.fanChanged = S.t; }
+    else if (S.fan && wantOff && S.t - S.fanChanged >= 0.5) { S.fan = false; S.fanChanged = S.t; }
+  } else S.fan = false;
+  // humidity dynamics
+  for (const L of LAYERS) {
+    const off = sc.heapOffset + (L === "bot" ? 3 : L === "top" ? -2 : 0) + 18 * S.rot * LAYER_W[L];
+    const target = Math.min(99, ambientDailyMean() + off);
+    if (S.fan) S.rh[L] += (amb.rh + 2 - S.rh[L]) * Math.min(1, 0.35 * dt);
+    else S.rh[L] += (target - S.rh[L]) * Math.min(1, 0.06 * dt);
+    S.rh[L] = Math.max(30, Math.min(99, S.rh[L]));
+  }
+  // rot growth: driven by sustained humidity in the heap + seeded rot
+  const wet = Math.max(0, (Math.max(S.rh.mid, S.rh.bot) - 82) / 12);
+  // active rot keeps spreading (fan only slows the humidity-driven part)
+  const seeded = sc.rotSeedRate * (S.rot > 0 ? 1 + 1.5 * S.rot : 0);
+  const humid = (0.010 * wet + 0.012 * S.rot * wet) * (S.fan ? 0.35 : 1);
+  const g = seeded + humid;
+  S.rot = Math.min(1, S.rot + g * dt);
+  S.t += dt;
+}
+function ambientDailyMean() { return SC[scenario].ambRhBase; }
+function layerTemp(L, amb) { return 27 + 0.4 + 4.2 * S.rot * LAYER_W[L] - (S.fan ? 0.8 : 0) + 0.25 * (amb.t - 27); }
+function gasMv() { return 420 * (1 + 0.95 * S.rot) + S.gasNoise; }
+
+// ------------------------------------------------------------------ risk + advice (ported from backend/app/rotrisk.py + advisory.py)
+const clamp01 = x => Math.max(0, Math.min(1, x));
+function risk(layers, amb, gas) {
+  const comps = {}, reasons = [];
+  const rise = (gas - 420) / 420;
+  comps.gas = 100 * clamp01(rise / 0.6);
+  if (rise > 0.15) reasons.push(`rot gas +${Math.round(rise * 100)}%`);
+  let worst = "top"; for (const L of LAYERS) if (layers[L].rh > layers[worst].rh) worst = L;
+  const rh = layers[worst].rh;
+  comps.humid = 100 * clamp01((rh - 70) / 20);
+  if (rh > 80) reasons.push(`humidity ${Math.round(rh)}% in ${NAME[worst]} layer`);
+  let hot = "top"; for (const L of LAYERS) if (layers[L].t > layers[hot].t) hot = L;
+  const hs = layers[hot].t - amb.t;
+  comps.heat = 100 * clamp01(hs / 4);
+  if (hs > 1.5) { reasons.push(`${NAME[hot]} ${hs.toFixed(1)}°C warmer than outside`); if (comps.heat >= comps.humid) worst = hot; }
+  const score = 0.5 * comps.gas + 0.3 * comps.humid + 0.2 * comps.heat;
+  const level = score >= 65 ? "ROT" : score >= 35 ? "WATCH" : "SAFE";
+  return { score, level, worst, reasons: reasons.length ? reasons : ["conditions normal"] };
+}
+const NAME = { top: "top", mid: "middle", bot: "bottom" };
+const LMR = { top: "वरच्या", mid: "मधल्या", bot: "खालच्या" };
+function advice(level, worst) {
+  const pmr = ` आजचा लासलगाव भाव ₹${PRICE.modal}/क्विंटल.`, pen = ` Today's Lasalgaon rate ₹${PRICE.modal}/quintal.`;
+  if (level === "ROT") return { action: "SORT_SELL", sev: "rot",
+    mr: `धोका: ${LMR[worst]} थरात कांदा सडायला सुरुवात झाली आहे. आज निवडणी करा आणि खराब कांदा वेगळा करा.${pmr}`,
+    en: `Alert: rot has started in the ${NAME[worst]} layer. Sort today and separate the damaged onions.${pen}` };
+  if (level === "WATCH") return { action: "VENTILATE", sev: "watch",
+    mr: `कांद्यात ओलावा/उष्णता वाढत आहे. ${kitOn ? "पंखे चालू आहेत." : ""} आज एकदा कांदा तपासा.${pmr}`.replace("  ", " "),
+    en: `Moisture/heat is rising in the heap.${kitOn ? " Fans are running." : ""} Check the onions once today.${pen}` };
+  return { action: "HOLD", sev: "safe", mr: `तुमचा कांदा सुरक्षित आहे. आत्ता विकू नका, थांबा.${pmr}`, en: `Your onions are safe. Don't sell yet, hold.${pen}` };
+}
+
+// ------------------------------------------------------------------ 3D scene
+const canvas = $("cv"), stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1));
+renderer.shadowMap.enabled = true;
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(42, 1.4, 0.1, 200);
+camera.position.set(11, 7.5, 12);
+const controls = new THREE.OrbitControls(camera, canvas);
+controls.target.set(0, 1.6, 0); controls.enableDamping = true; controls.minDistance = 7; controls.maxDistance = 30;
+controls.maxPolarAngle = Math.PI * 0.49; controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.5;
+canvas.addEventListener("pointerdown", () => { controls.autoRotate = false; });
+
+const hemi = new THREE.HemisphereLight(0xffffff, 0x6b5a45, 0.75); scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xffffff, 0.9); sun.position.set(8, 14, 6); sun.castShadow = true;
+sun.shadow.mapSize.set(1024, 1024); Object.assign(sun.shadow.camera, { left: -12, right: 12, top: 12, bottom: -12 }); scene.add(sun);
+
+const M = (c, o = {}) => new THREE.MeshStandardMaterial({ color: c, roughness: 0.85, ...o });
+const box = (w, h, d, mat, x, y, z) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat); m.position.set(x, y, z); m.castShadow = m.receiveShadow = true; scene.add(m); return m; };
+
+// ground
+const ground = new THREE.Mesh(new THREE.PlaneGeometry(60, 60), M(0x8f8268)); ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+// raised slatted floor (ventilated base of a kanda chawl)
+const wood = M(0x8a6a44), woodDark = M(0x6e5134), tin = M(0xa9b2bd, { metalness: 0.5, roughness: 0.5 });
+for (let i = 0; i < 4; i++) for (let j = 0; j < 2; j++) box(0.25, 0.6, 0.25, woodDark, -3.6 + i * 2.4, 0.3, -1.6 + j * 3.2);
+for (let i = 0; i < 15; i++) box(7.6, 0.08, 0.14, wood, 0, 0.64, -1.75 + i * 0.25);
+// slatted side walls (front/back long sides)
+const HEAP_W = 7.2, HEAP_D = 3.2, HEAP_H = 2.2, FLOOR = 0.68;
+for (const z of [-HEAP_D / 2 - 0.08, HEAP_D / 2 + 0.08]) {
+  for (let k = 0; k < 6; k++) box(HEAP_W + 0.2, 0.12, 0.06, wood, 0, FLOOR + 0.25 + k * 0.42, z);
+  for (const x of [-3.7, -1.2, 1.2, 3.7]) box(0.14, 3.6, 0.14, woodDark, x, FLOOR + 1.75, z);
+}
+// end wall (left) slats; right end has the fan
+for (let k = 0; k < 6; k++) box(0.06, 0.12, HEAP_D + 0.2, wood, -3.7, FLOOR + 0.25 + k * 0.42, 0);
+for (let k = 0; k < 6; k++) if (k !== 2 && k !== 3) box(0.06, 0.12, HEAP_D + 0.2, wood, 3.7, FLOOR + 0.25 + k * 0.42, 0);
+// sloped tin roof
+const roofL = new THREE.Mesh(new THREE.BoxGeometry(8.4, 0.06, 2.4), tin); roofL.position.set(0, 4.25, -0.95); roofL.rotation.x = 0.42; roofL.castShadow = true; scene.add(roofL);
+const roofR = roofL.clone(); roofR.position.z = 0.95; roofR.rotation.x = -0.42; scene.add(roofR);
+
+// onions (instanced)
+const ON = 1500;
+const onionGeo = new THREE.SphereGeometry(0.13, 10, 8);
+const onionMat = new THREE.MeshStandardMaterial({ roughness: 0.6 });
+const onions = new THREE.InstancedMesh(onionGeo, onionMat, ON);
+onions.castShadow = true; onions.receiveShadow = true;
+const freshCols = [0x9b3b52, 0xa8485c, 0x8a3046, 0xb05a5f, 0x93405a].map(c => new THREE.Color(c));
+const rotCol = new THREE.Color(0x4e3b26), rotCol2 = new THREE.Color(0x5e5a2c);
+const onionInfo = [];
+const dummy = new THREE.Object3D();
+let n = 0;
+while (n < ON) {
+  const x = (Math.random() - 0.5) * (HEAP_W - 0.3), z = (Math.random() - 0.5) * (HEAP_D - 0.3);
+  const yMax = FLOOR + HEAP_H * (1 - 0.18 * Math.pow(Math.abs(x) / (HEAP_W / 2), 3));
+  const y = FLOOR + 0.12 + Math.random() * (yMax - FLOOR - 0.12);
+  dummy.position.set(x, y, z);
+  dummy.rotation.set(Math.random() * 3, Math.random() * 3, Math.random() * 3);
+  const s = 0.85 + Math.random() * 0.35; dummy.scale.set(s, s * 0.82, s);
+  dummy.updateMatrix(); onions.setMatrixAt(n, dummy.matrix);
+  // rot spreads from bottom, slightly off-centre (a wet corner)
+  const d = Math.hypot((x - 1.2) / HEAP_W, (y - FLOOR) / (HEAP_H * 0.9), z / HEAP_D);
+  onionInfo.push({ thr: d * 1.25 + Math.random() * 0.18, fresh: freshCols[n % freshCols.length], rc: Math.random() < 0.7 ? rotCol : rotCol2 });
+  onions.setColorAt(n, onionInfo[n].fresh);
+  n++;
+}
+scene.add(onions);
+
+// probe stick with 3 sensor bands
+const probeX = -0.6, probeZ = 0.3;
+const pipe = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 3.2, 16), M(0xe8e8e8)); pipe.position.set(probeX, FLOOR + 1.45, probeZ); scene.add(pipe);
+const bandY = { top: FLOOR + HEAP_H - 0.35, mid: FLOOR + HEAP_H * 0.52, bot: FLOOR + 0.3 };
+const bands = {};
+for (const L of LAYERS) {
+  const b = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.13, 0.16, 20), new THREE.MeshStandardMaterial({ color: 0x2e7d4f, emissive: 0x2e7d4f, emissiveIntensity: 0.6 }));
+  b.position.set(probeX, bandY[L], probeZ); scene.add(b); bands[L] = b;
+}
+// gas pod on top of heap
+const pod = box(0.5, 0.26, 0.4, M(0x1b2a5c), 1.0, FLOOR + HEAP_H + 0.12, -0.2);
+const podRing = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.025, 8, 40), new THREE.MeshBasicMaterial({ color: 0xb3261e, transparent: true, opacity: 0 }));
+podRing.rotation.x = Math.PI / 2; podRing.position.copy(pod.position); scene.add(podRing);
+
+// fan on right end wall
+const fanGroup = new THREE.Group(); fanGroup.position.set(3.9, FLOOR + 1.25, 0); fanGroup.rotation.z = Math.PI / 2; scene.add(fanGroup);
+const fanFrame = new THREE.Mesh(new THREE.BoxGeometry(1.0, 0.12, 1.0), M(0x2b2f36)); fanGroup.add(fanFrame);
+const hub = new THREE.Group(); fanGroup.add(hub);
+for (let i = 0; i < 4; i++) { const bl = new THREE.Mesh(new THREE.BoxGeometry(0.42, 0.03, 0.14), M(0xd0d4da)); bl.position.x = 0.22; const arm = new THREE.Group(); arm.rotation.y = i * Math.PI / 2; arm.add(bl); hub.add(arm); }
+hub.position.y = 0.08;
+
+// control box + solar + antenna on a post outside
+box(0.12, 3.4, 0.12, woodDark, 5.2, 1.7, 1.9);
+const ctl = box(0.7, 0.55, 0.3, M(0xf2f2f2), 5.2, 2.4, 2.1);
+const led = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshBasicMaterial({ color: 0x2e7d4f })); led.position.set(5.2, 2.55, 2.27); scene.add(led);
+const panel = box(1.3, 0.05, 0.9, M(0x1d3557, { metalness: 0.4, roughness: 0.3 }), 5.2, 3.5, 1.9); panel.rotation.x = -0.5;
+const ant = box(0.03, 0.6, 0.03, M(0x333333), 5.5, 2.95, 2.1);
+const waves = [0, 1, 2].map(i => { const w = new THREE.Mesh(new THREE.TorusGeometry(0.2 + i * 0.18, 0.012, 6, 30), new THREE.MeshBasicMaterial({ color: 0x1a73e8, transparent: true, opacity: 0.6 })); w.position.set(5.5, 3.3, 2.1); scene.add(w); return w; });
+// ambient sensor (shaded, on post)
+const ambS = box(0.18, 0.24, 0.12, M(0xffffff), 5.2, 1.4, 2.0);
+
+// airflow particles
+const PN = 260;
+const pGeo = new THREE.BufferGeometry(); const pPos = new Float32Array(PN * 3); const pSeed = [];
+for (let i = 0; i < PN; i++) { pSeed.push({ y: FLOOR + 0.3 + Math.random() * (HEAP_H - 0.2), z: (Math.random() - 0.5) * (HEAP_D - 0.4), x: Math.random() }); }
+pGeo.setAttribute("position", new THREE.BufferAttribute(pPos, 3));
+const pMat = new THREE.PointsMaterial({ color: 0x7fb3e6, size: 0.09, transparent: true, opacity: 0 });
+scene.add(new THREE.Points(pGeo, pMat));
+
+// labels
+const labelDefs = [
+  ["Probe stick: 3 sensors (top / mid / bottom)", new THREE.Vector3(probeX, FLOOR + HEAP_H + 1.2, probeZ)],
+  ["Gas pod (rot smell)", new THREE.Vector3(1.0, FLOOR + HEAP_H + 0.55, -0.2)],
+  ["Auto fan", new THREE.Vector3(3.95, FLOOR + 2.0, 0)],
+  ["Solar + control box + 4G", new THREE.Vector3(5.2, 4.1, 1.9)],
+  ["Outside air sensor", new THREE.Vector3(5.2, 1.75, 2.05)],
+  ["Onion heap (≈ 25 t chawl)", new THREE.Vector3(-2.9, FLOOR + 0.9, HEAP_D / 2 + 0.3)],
+];
+const labelEls = labelDefs.map(([t]) => { const d = document.createElement("div"); d.className = "lbl"; d.textContent = t; $("labels").appendChild(d); return d; });
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+function applyTheme() { scene.background = new THREE.Color(css("--scene") || "#DCE3EA"); }
+applyTheme();
+matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+new MutationObserver(applyTheme).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+// ------------------------------------------------------------------ UI state
+let scenario = "humid", kitOn = true, netOn = true, playing = true, speed = 4;
+const sevColor = { safe: "--safe", watch: "--watch", rot: "--rot" };
+function lvlColor(rh, t, amb) { if (rh > 85 || t - amb.t > 2.5) return 0xb3261e; if (rh > 78 || t - amb.t > 1.5) return 0xb86e00; return 0x2e7d4f; }
+
+function setPressed(groupAttr, val) {
+  document.querySelectorAll(`[${groupAttr}]`).forEach(b => b.setAttribute("aria-pressed", String(b.getAttribute(groupAttr) === String(val))));
+}
+document.querySelectorAll("[data-sc]").forEach(b => b.addEventListener("click", () => { scenario = b.dataset.sc; setPressed("data-sc", scenario); resetSim(); updateUI(true); }));
+document.querySelectorAll("[data-sp]").forEach(b => b.addEventListener("click", () => { speed = +b.dataset.sp; setPressed("data-sp", speed); }));
+$("play").addEventListener("click", () => { playing = !playing; $("play").textContent = playing ? "Pause" : "Play"; $("play").setAttribute("aria-pressed", String(playing)); });
+$("reset").addEventListener("click", () => { resetSim(); updateUI(true); });
+$("kit").addEventListener("change", e => { kitOn = e.target.checked; $("kitlbl").textContent = kitOn ? "Kanda Rakshak kit ON" : "Kit OFF (traditional chawl)"; resetSim(); updateUI(true); });
+$("net").addEventListener("change", e => { netOn = e.target.checked; $("netlbl").textContent = netOn ? "Mobile network ON" : "No network (offline)"; if (netOn) flushQueue(); updateUI(true); });
+$("lbls").addEventListener("change", e => { $("labels").hidden = !e.target.checked; });
+
+const fmtClock = t => { const d = Math.floor(t / 24) + 1, h = Math.floor(t % 24), m = Math.floor((t % 1) * 60); return `Day ${d} · ${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`; };
+
+function deliver(a) {
+  const stamp = fmtClock(S.t);
+  if (!kitOn) return;
+  if (!netOn) { S.queue.push({ ...a, stamp }); return; }
+  S.msg = { ...a, stamp };
+}
+function flushQueue() { if (S.queue.length) { S.msg = { ...S.queue[S.queue.length - 1], stamp: S.queue[S.queue.length - 1].stamp + " (delivered late)" }; S.queue = []; } }
+
+let lastRisk = null;
+function updateUI(force) {
+  const amb = ambient(S.t);
+  const layers = {}; for (const L of LAYERS) layers[L] = { t: layerTemp(L, amb), rh: S.rh[L] };
+  const gas = gasMv();
+  const r = risk(layers, amb, gas); lastRisk = r;
+  const a = advice(r.level, r.worst);
+  if (a.action !== S.lastAction) { S.lastAction = a.action; deliver(a); }
+
+  $("clock").textContent = fmtClock(S.t);
+  $("amb").textContent = `Outside ${amb.t.toFixed(1)}°C · ${Math.round(amb.rh)}% RH`;
+  const affected = onionInfo.reduce((s, o) => s + (S.rot * 1.25 > o.thr ? 1 : 0), 0) / ON;
+  $("loss").textContent = `Onion affected ${Math.round(affected * 100)}%`;
+
+  const names = { top: "TOP", mid: "MIDDLE", bot: "BOTTOM" };
+  $("layers").innerHTML = LAYERS.map(L => {
+    const c = lvlColor(layers[L].rh, layers[L].t, amb);
+    const v = c === 0xb3261e ? "--rot" : c === 0xb86e00 ? "--watch" : "--safe";
+    return `<div class="lay" style="border-top-color:var(${v})"><b>${names[L]}</b><span>${layers[L].t.toFixed(1)}°C</span><span>${Math.round(layers[L].rh)}%</span></div>`;
+  }).join("") + `<div class="lay"><b>OUTSIDE</b><span>${amb.t.toFixed(1)}°C</span><span>${Math.round(amb.rh)}%</span></div>`;
+  $("gas").textContent = `+${Math.max(0, Math.round((gas - 420) / 420 * 100))}%`;
+  $("fan").textContent = !kitOn ? "none" : S.fan ? "ON" : "OFF";
+  $("risk").textContent = Math.round(r.score);
+  const lv = $("level"); lv.textContent = r.level; lv.style.background = `var(${sevColor[r.level.toLowerCase()] || "--grey"})`;
+  $("reason").textContent = r.reasons.join(" · ");
+  const mtr = $("meter"); mtr.style.width = `${Math.round(r.score)}%`; mtr.style.background = `var(${sevColor[r.level.toLowerCase()]})`;
+
+  if (!kitOn) { $("msgmr").textContent = "कोणताही संदेश नाही."; $("msgen").textContent = "Traditional chawl: no sensors, no alert. The farmer finds rot only when it smells."; $("msgmeta").textContent = ""; }
+  else if (S.msg) { $("msgmr").textContent = S.msg.mr; $("msgen").textContent = S.msg.en; $("msgmeta").textContent = `${S.msg.stamp} · voice call + SMS`; }
+  $("sig").textContent = netOn ? "4G ▂▄▆" : "No signal ✕";
+  const q = $("queue"); q.hidden = !(kitOn && !netOn);
+  q.textContent = `Offline: fan still runs on the device. ${S.queue.length} message(s) waiting, sent when signal returns.`;
+
+  // steps highlight
+  ["st1", "st2", "st3", "st4"].forEach(id => $(id).classList.remove("on"));
+  if (kitOn) { $("st2").classList.add("on"); if (S.fan) $("st3").classList.add("on"); if (S.msg && netOn) $("st4").classList.add("on"); }
+  else $("st1").classList.add("on");
+
+  // 3D state
+  for (const L of LAYERS) { const c = lvlColor(layers[L].rh, layers[L].t, amb); bands[L].material.color.setHex(c); bands[L].material.emissive.setHex(c); bands[L].visible = kitOn; }
+  pod.visible = podRing.visible = kitOn; fanGroup.visible = true; ctl.visible = led.visible = panel.visible = ant.visible = ambS.visible = kitOn;
+  pipe.visible = kitOn;
+  for (let i = 0; i < ON; i++) { const o = onionInfo[i]; const rotted = S.rot * 1.25 > o.thr; onions.setColorAt(i, rotted ? o.rc : o.fresh); }
+  onions.instanceColor.needsUpdate = true;
+  labelEls.forEach((el, i) => { el.hidden = !kitOn && i < 5; });
+}
+
+// ------------------------------------------------------------------ loop
+if (window.innerWidth < 600) { $("lbls").checked = false; $("labels").hidden = true; }
+resetSim(); updateUI(true);
+let last = performance.now(), uiAcc = 0;
+const proj = new THREE.Vector3();
+function frame(now) {
+  const dtReal = Math.min(0.1, (now - last) / 1000); last = now;
+  if (playing) {
+    let simDt = dtReal * speed; while (simDt > 0) { const d = Math.min(0.1, simDt); step(d); simDt -= d; }
+    S.gasNoise = (Math.random() - 0.5) * 10;
+    if (S.t > 24 * 6) { resetSim(); }
+  }
+  uiAcc += dtReal; if (uiAcc > 0.25) { uiAcc = 0; updateUI(); }
+
+  // day/night light
+  const hour = S.t % 24, dayF = Math.max(0.15, Math.sin(Math.PI * (hour - 6) / 12));
+  sun.intensity = 0.25 + 0.75 * Math.max(0, dayF); hemi.intensity = 0.45 + 0.35 * dayF;
+  const ang = Math.PI * (hour - 6) / 12; sun.position.set(14 * Math.cos(ang), 4 + 12 * Math.max(0.05, Math.sin(ang)), 6);
+
+  // fan + airflow
+  const spinning = kitOn && S.fan;
+  if (spinning && !reduceMotion) hub.rotation.y += dtReal * 25;
+  pMat.opacity += ((spinning ? 0.85 : 0) - pMat.opacity) * Math.min(1, dtReal * 3);
+  for (let i = 0; i < PN; i++) {
+    const s = pSeed[i]; if (spinning) s.x = (s.x + dtReal * 0.35) % 1;
+    pPos[i * 3] = 3.8 - s.x * (HEAP_W + 2.2); pPos[i * 3 + 1] = s.y + Math.sin(s.x * 8 + i) * 0.06; pPos[i * 3 + 2] = s.z;
+  }
+  pGeo.attributes.position.needsUpdate = true;
+
+  // gas ring pulse when risk high, network waves
+  const lvl = lastRisk ? lastRisk.level : "SAFE";
+  const pulse = (now / 900) % 1;
+  podRing.scale.setScalar(1 + pulse * 1.6); podRing.material.opacity = lvl === "SAFE" ? 0 : (1 - pulse) * (lvl === "ROT" ? 0.9 : 0.5);
+  podRing.material.color.setHex(lvl === "ROT" ? 0xb3261e : 0xb86e00);
+  waves.forEach((w, i) => { const p = ((now / 1200) + i / 3) % 1; w.scale.setScalar(0.6 + p * 1.4); w.material.opacity = netOn && kitOn ? (1 - p) * 0.7 : 0; });
+  led.material.color.setHex(!netOn ? 0xb86e00 : lvl === "ROT" ? 0xb3261e : 0x2e7d4f);
+
+  controls.update();
+  renderer.render(scene, camera);
+
+  // labels
+  if (!$("labels").hidden) {
+    const w = stage.clientWidth, h = stage.clientHeight;
+    labelDefs.forEach(([, p], i) => {
+      proj.copy(p).project(camera);
+      const el = labelEls[i]; const vis = proj.z < 1 && !el.hidden;
+      el.style.display = vis ? "" : "none";
+      el.style.left = `${(proj.x * 0.5 + 0.5) * w}px`; el.style.top = `${(-proj.y * 0.5 + 0.5) * h - 8}px`;
+    });
+  }
+  requestAnimationFrame(frame);
+}
+resize();
+requestAnimationFrame(frame);
+})();
+</script>

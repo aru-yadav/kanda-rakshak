@@ -30,6 +30,10 @@ class Settings:
         self.telegram_chat_id = _get("TELEGRAM_CHAT_ID")
         self.notify_voice = _get("NOTIFY_VOICE", "true").lower() == "true"
         self.notify_min_interval_s = int(_get("NOTIFY_MIN_INTERVAL_S", "3600"))
+        # DEMO_MODE: lets the dashboard drive simulated (SIM-*) sheds without an admin token.
+        nd = _get("NOTIFY_DEVICES", "SIM-NSK-01,KR-01")
+        self.notify_devices = [d.strip() for d in nd.split(",") if d.strip()]  # empty = all devices
+        self.demo_mode = _get("DEMO_MODE", "true").lower() == "true"
 
 
 settings = Settings()

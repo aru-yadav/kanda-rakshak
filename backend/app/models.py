@@ -40,3 +40,21 @@ class ReadingIn(BaseModel):
 class FanCommand(BaseModel):
     mode: Literal["on", "off", "auto"]
     ttl_s: int = Field(default=600, ge=30, le=24 * 3600)
+
+
+class DeviceMeta(BaseModel):
+    device_id: str = Field(min_length=2, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
+    farmer: Optional[str] = Field(default=None, max_length=60)
+    village: Optional[str] = Field(default=None, max_length=60)
+    taluka: Optional[str] = Field(default=None, max_length=60)
+    lat: Optional[float] = Field(default=None, ge=-90, le=90)
+    lon: Optional[float] = Field(default=None, ge=-180, le=180)
+    tonnes: Optional[float] = Field(default=None, ge=0, le=10000)
+    crop: Optional[str] = Field(default="onion", max_length=20)
+
+
+class SimControl(BaseModel):
+    scenario: Optional[Literal["fresh", "humid", "rot"]] = None
+    offline: Optional[bool] = None
+    kit_on: Optional[bool] = None
+    reset: Optional[bool] = None
