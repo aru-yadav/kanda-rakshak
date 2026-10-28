@@ -21,6 +21,9 @@ from .notify import Notifier
 from .price import PriceService
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+# httpx logs every request URL at INFO: that would print the data.gov.in api-key and the Telegram bot token.
+for _noisy in ("httpx", "httpcore"):
+    logging.getLogger(_noisy).setLevel(logging.WARNING)
 
 DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard"
 

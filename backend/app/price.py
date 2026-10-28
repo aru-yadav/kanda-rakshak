@@ -9,6 +9,8 @@ from datetime import datetime, timezone
 from statistics import mean
 from typing import Optional
 
+from urllib.parse import quote, quote_plus
+
 import httpx
 
 from .config import settings
@@ -64,6 +66,27 @@ def pick_market(rows: list[dict], preferred: list[str]) -> Optional[dict]:
             return max(hits, key=lambda r: r["modal"])  # if several varieties, take the highest modal (usually main red onion)
     s = sorted(today_rows, key=lambda r: r["modal"])
     return s[len(s) // 2]
+
+
+REDACTED = "REDACTED"
+
+
+def redact(text: str) -> str:
+    """Remove the data.gov.in key from any string, in raw and URL-encoded forms (httpx errors embed the URL)."""
+    key = settings.datagov_api_key
+    if not key:
+        return text
+    for form in sorted({key, quote_plus(key), quote(key, safe=""), str(httpx.QueryParams({"k": key}))[2:]},
+                       key=len, reverse=True):
+        text = text.replace(form, REDACTED)
+    return text
+
+
+def describe_error(e: Exception) -> str:
+    """Safe one-line error for logs and /explain. HTTP errors are reduced to their status code."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return f"HTTP {e.response.status_code} from data.gov.in"
+    return redact(f"{type(e).__name__}: {e}")
 
 
 def fetch_live(client: Optional[httpx.Client] = None) -> list[dict]:
@@ -133,7 +156,7 @@ class PriceService:
                 self._store(rows)
                 log.info("price: stored %d rows", len(rows))
         except Exception as e:  # network, key, schema — never crash the API
-            log.warning("price fetch failed: %s", e)
+            log.warning("price fetch failed: %s", describe_error(e))
 
     def current(self) -> Optional[dict]:
         self.refresh()
