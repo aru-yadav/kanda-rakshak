@@ -89,23 +89,39 @@ def describe_error(e: Exception) -> str:
     return redact(f"{type(e).__name__}: {e}")
 
 
-def fetch_live(client: Optional[httpx.Client] = None) -> list[dict]:
+def _params(key: str) -> list[dict]:
+    base = {"api-key": key, "format": "json", "limit": 500}
+    # The API has used both 'filters[state]' and 'filters[state.keyword]' styles; try both.
+    return [
+        {**base, "filters[state.keyword]": settings.price_state, "filters[commodity]": settings.price_commodity},
+        {**base, "filters[state]": settings.price_state, "filters[commodity]": settings.price_commodity},
+    ]
+
+
+def redacted_urls() -> list[str]:
+    """The exact request URLs fetch_live() sends, built with the key replaced, in order."""
+    url = API.format(rid=settings.datagov_resource_id)
+    return [str(httpx.URL(url, params=p)) for p in _params(REDACTED)]
+
+
+def fetch_live(client: Optional[httpx.Client] = None, trace: Optional[list] = None) -> list[dict]:
+    """trace (optional) gets one {url (key redacted), status, rows} entry per request sent."""
     if not settings.datagov_api_key:
         raise RuntimeError("DATAGOV_API_KEY not set")
     url = API.format(rid=settings.datagov_resource_id)
-    base = {"api-key": settings.datagov_api_key, "format": "json", "limit": 500}
-    # The API has used both 'filters[state]' and 'filters[state.keyword]' styles; try both.
-    variants = [
-        {"filters[state.keyword]": settings.price_state, "filters[commodity]": settings.price_commodity},
-        {"filters[state]": settings.price_state, "filters[commodity]": settings.price_commodity},
-    ]
+    shown = redacted_urls()
     own = client is None
     client = client or httpx.Client(timeout=15)
     try:
-        for v in variants:
-            resp = client.get(url, params={**base, **v})
+        for i, params in enumerate(_params(settings.datagov_api_key)):
+            step = {"url": shown[i], "status": None, "rows": 0}
+            if trace is not None:
+                trace.append(step)
+            resp = client.get(url, params=params)
+            step["status"] = resp.status_code
             resp.raise_for_status()
             rows = parse_records(resp.json().get("records", []), settings.price_markets)
+            step["rows"] = len(rows)
             if rows:
                 return rows
         return []
@@ -118,6 +134,8 @@ class PriceService:
     def __init__(self, db: DB) -> None:
         self.db = db
         self._last_try: Optional[datetime] = None
+        # what the most recent fetch attempt did (in memory; reset on restart). Never holds the api key.
+        self.last_fetch: Optional[dict] = None
 
     def _store(self, rows: list[dict]) -> None:
         now = datetime.now(timezone.utc).isoformat()
@@ -150,13 +168,17 @@ class PriceService:
         if not force and self._last_try and (now - self._last_try).total_seconds() < 3 * 3600:
             return
         self._last_try = now
+        attempts: list[dict] = []
+        self.last_fetch = {"at": now.isoformat(), "ok": False, "rows": 0, "error": None, "attempts": attempts}
         try:
-            rows = fetch_live()
+            rows = fetch_live(trace=attempts)
+            self.last_fetch.update(ok=bool(rows), rows=len(rows))
             if rows:
                 self._store(rows)
                 log.info("price: stored %d rows", len(rows))
         except Exception as e:  # network, key, schema — never crash the API
-            log.warning("price fetch failed: %s", describe_error(e))
+            self.last_fetch["error"] = describe_error(e)
+            log.warning("price fetch failed: %s", self.last_fetch["error"])
 
     def current(self) -> Optional[dict]:
         self.refresh()
@@ -167,11 +189,11 @@ class PriceService:
             return {
                 "market": c["market"], "arrival_date": c["arrival_date"], "modal": c["modal"],
                 "min_price": c["min_price"], "max_price": c["max_price"], "variety": c["variety"],
-                "unit": "Rs/quintal", "source": source,
+                "unit": "Rs/quintal", "source": source, "fetched_at": c["fetched_at"],
                 "trend_pct": self._trend(c["market"], c["modal"], c["arrival_date"]),
             }
         if settings.price_fallback_modal:
             return {"market": settings.price_fallback_market, "arrival_date": None,
                     "modal": settings.price_fallback_modal, "unit": "Rs/quintal",
-                    "source": "fallback", "trend_pct": None}
+                    "source": "fallback", "fetched_at": None, "trend_pct": None}
         return None

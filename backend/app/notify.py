@@ -1,5 +1,6 @@
 """Notifications. Demo channel: Telegram (Marathi text + Marathi voice note).
 Production: DLT-registered SMS + IVR (see docs/TECH_STACK.md)."""
+import json
 import logging
 import tempfile
 from datetime import datetime, timezone
@@ -31,18 +32,35 @@ class Notifier:
     def __init__(self, db: DB) -> None:
         self.db = db
 
-    def _last(self, device_id: str):
-        rows = self.db.query("SELECT * FROM notifications WHERE device_id=? ORDER BY id DESC LIMIT 1", (device_id,))
+    def _last(self, device_id: str, before: Optional[datetime] = None):
+        if before is None:
+            rows = self.db.query("SELECT * FROM notifications WHERE device_id=? ORDER BY id DESC LIMIT 1", (device_id,))
+        else:
+            rows = self.db.query("SELECT * FROM notifications WHERE device_id=? AND sent_at<? ORDER BY id DESC LIMIT 1",
+                                 (device_id, before.isoformat()))
         return rows[0] if rows else None
 
-    def should_send(self, device_id: str, advice: Advice) -> bool:
-        last = self._last(device_id)
-        if last is None or last["action"] != advice.action:
-            return advice.action != "NO_DATA"
-        age = (datetime.now(timezone.utc) - datetime.fromisoformat(last["sent_at"])).total_seconds()
-        return age >= settings.notify_min_interval_s
+    def check(self, device_id: str, advice: Advice, as_of: Optional[datetime] = None) -> tuple[bool, str]:
+        """(send?, why) — the farmer gets a message only when the advice changes, or the same advice after the min interval.
+        as_of: judge against message history as it was at that moment (default: now)."""
+        if advice.action == "NO_DATA":
+            return False, "NO_DATA advice is never messaged to the farmer"
+        last = self._last(device_id, as_of)
+        if last is None:
+            return True, "first message for this device"
+        if last["action"] != advice.action:
+            return True, f"advice changed from {last['action']} to {advice.action}"
+        age = ((as_of or datetime.now(timezone.utc)) - datetime.fromisoformat(last["sent_at"])).total_seconds()
+        if age >= settings.notify_min_interval_s:
+            return True, f"same advice, last sent {age / 60:.0f} min ago (>= {settings.notify_min_interval_s // 60} min)"
+        return False, f"same advice already sent {age / 60:.0f} min ago (repeat after {settings.notify_min_interval_s // 60} min)"
 
-    def send(self, device_id: str, advice: Advice, simulated: bool = False) -> str:
+    def should_send(self, device_id: str, advice: Advice) -> bool:
+        return self.check(device_id, advice)[0]
+
+    def send(self, device_id: str, advice: Advice, simulated: bool = False,
+             reading_id: Optional[int] = None, price: Optional[dict] = None) -> str:
+        """reading_id/price: which reading triggered this and the price snapshot used, so /explain shows what was sent."""
         tag = "[SIMULATED] " if simulated else ""
         text = f"{tag}कांदा रक्षक · {device_id}\n\n{advice.text_mr}\n\n— {advice.text_en}"
         channel = "console"
@@ -63,7 +81,9 @@ class Notifier:
                 log.warning("telegram failed: %s", e)
                 channel = "console(telegram-failed)"
         self.db.execute(
-            "INSERT INTO notifications(device_id, sent_at, action, text_mr, text_en, channel) VALUES (?,?,?,?,?,?)",
-            (device_id, datetime.now(timezone.utc).isoformat(), advice.action, advice.text_mr, advice.text_en, channel),
+            "INSERT INTO notifications(device_id, sent_at, action, text_mr, text_en, channel, reading_id, price) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (device_id, datetime.now(timezone.utc).isoformat(), advice.action, advice.text_mr, advice.text_en, channel,
+             reading_id, json.dumps(price) if price else None),
         )
         return channel

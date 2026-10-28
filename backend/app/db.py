@@ -35,9 +35,12 @@ CREATE TABLE IF NOT EXISTS sim_control (
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   device_id TEXT NOT NULL, sent_at TEXT NOT NULL, action TEXT NOT NULL,
-  text_mr TEXT, text_en TEXT, channel TEXT
+  text_mr TEXT, text_en TEXT, channel TEXT,
+  reading_id INTEGER, price TEXT
 );
 """
+# additive columns for databases created before they existed (CREATE TABLE IF NOT EXISTS won't add them)
+MIGRATIONS = {"notifications": {"reading_id": "INTEGER", "price": "TEXT"}}
 
 
 class DB:
@@ -48,6 +51,11 @@ class DB:
         self.lock = threading.Lock()
         with self.lock:
             self.conn.executescript(SCHEMA)
+            for table, cols in MIGRATIONS.items():
+                have = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}  # fixed names only
+                for col, typ in cols.items():
+                    if col not in have:
+                        self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
             self.conn.commit()
 
     def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:

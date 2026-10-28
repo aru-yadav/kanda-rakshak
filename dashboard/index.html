@@ -39,6 +39,19 @@
   .ctl b { font-size:12px; color:#8A4B00; text-transform:uppercase; letter-spacing:.06em; margin-right:4px; }
   .ctl button { font:inherit; font-size:13px; border:1px solid var(--border); background:#fff; border-radius:999px; padding:5px 12px; cursor:pointer; }
   .ctl button.on { background:var(--navy); color:#fff; border-color:var(--navy); }
+  /* "Why this advice?" — top-to-bottom decision trace from /explain */
+  .why summary { cursor:pointer; list-style:none; } .why summary::-webkit-details-marker { display:none; }
+  .why summary h2 { display:inline; } .why summary::after { content:" ▾"; color:var(--muted); }
+  .why[open] summary::after { content:" ▴"; }
+  .flow { display:flex; flex-direction:column; align-items:stretch; margin-top:10px; }
+  .step { border:1px solid var(--border); border-left:4px solid var(--navy); border-radius:10px; padding:10px 12px; background:var(--bg); }
+  .step h3 { margin:0 0 6px; font-size:14px; color:var(--navy); } .step h3 small { color:var(--muted); font-weight:normal; }
+  .arrow { text-align:center; color:var(--orange); font-size:20px; line-height:1; padding:2px 0; }
+  .step table { border-collapse:collapse; font-size:13px; width:100%; }
+  .step td, .step th { padding:3px 8px 3px 0; text-align:left; vertical-align:top; } .step th { color:var(--muted); font-weight:normal; font-size:12px; }
+  .num { font-variant-numeric:tabular-nums; }
+  code.f { font-size:12px; color:var(--muted); display:block; } code.url { font-size:12px; word-break:break-all; }
+  .gate { font-size:13px; margin:2px 0; } .gate .ok { color:var(--green); font-weight:bold; } .gate .no { color:var(--red); font-weight:bold; }
 </style>
 </head>
 <body>
@@ -74,12 +87,16 @@
   <section class="card c6"><h2>Humidity by layer (%)</h2><canvas id="chRh"></canvas></section>
   <section class="card c6"><h2>Rot gas (mV) and risk score</h2><canvas id="chGas"></canvas></section>
   <section class="card c12"><h2>Temperature by layer (°C)</h2><canvas id="chT"></canvas></section>
+
+  <section class="card c12"><details class="why" id="why" open><summary><h2>Why this advice?</h2>
+    <span class="muted" id="whymeta"></span></summary><div class="flow" id="whyflow"></div></details></section>
 </main>
 <script>
 const $ = id => document.getElementById(id);
 const IST = s => s ? new Date(s).toLocaleString('en-IN', {timeZone:'Asia/Kolkata'}) : '—';
 const fmt = (v, d=1) => v === null || v === undefined ? '—' : Number(v).toFixed(d);
 let charts = {}, current = null;
+const esc = v => String(v ?? '—').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
 
 function chart(id, datasets, y2=false) {
   if (charts[id]) charts[id].destroy();
@@ -156,6 +173,8 @@ async function refresh() {
   $('fan').innerHTML = d.fan_on ? '<span class="spin">✳</span> ON' : 'OFF';
   $('fanmeta').textContent = `mode: ${({A:'automatic',M:'manual',R:'remote override'})[d.fan_mode] || d.fan_mode}`;
 
+  refreshWhy();
+
   const h = await (await fetch(`/api/v1/devices/${current}/history?hours=48`)).json();
   const rows = h.rows;
   chart('chRh', [series(rows,'top_rh','Top','#1B2A5C'), series(rows,'mid_rh','Middle','#F28C28'),
@@ -166,7 +185,78 @@ async function refresh() {
                  series(rows,'risk_score','Risk score (0-100)','#C0392B','y1')], true);
 }
 
-$('dev').addEventListener('change', e => { current = e.target.value; refresh(); });
+const step = (n, title, sub, html) => `<div class="step"><h3>${n}. ${title} <small>${sub}</small></h3>${html}</div>`;
+const ARROW = '<div class="arrow" aria-hidden="true">↓</div>';
+const INPUTS = {
+  gas: i => `${i.sensor.toUpperCase()} ${fmt(i.mv,0)} mV vs baseline ${fmt(i.base_mv,0)} mV → rise ${fmt(i.rise_pct)}% (100 at ${fmt(i.full_at_pct,0)}%)`,
+  humid: i => `${i.layer} layer RH ${fmt(i.rh)}% (0 at ${fmt(i.rh_low,0)}%, 100 at ${fmt(i.rh_high,0)}%)`,
+  heat: i => `${i.hot_layer} ${fmt(i.t_hot)}°C − ${i.ref} ${fmt(i.t_ref)}°C = ${fmt(i.hotspot_c,2)}°C (100 at ${fmt(i.full_at_c,0)}°C)`,
+};
+function clearWhy(msg) { $('whymeta').textContent = ''; $('whyflow').innerHTML = `<div class="muted">${esc(msg)}</div>`; }
+async function refreshWhy() {
+  const dev = current;
+  let e;
+  try {
+    const r = await fetch(`/api/v1/devices/${encodeURIComponent(dev)}/explain`);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    e = await r.json();
+  } catch (err) {
+    if (dev === current) clearWhy(`No decision trace for ${dev} (${err.message})`);   // never leave another device's trace up
+    return;
+  }
+  if (e.device_id !== current) return;                                                 // stale response after a device switch
+  $('whymeta').textContent = ` · reading #${e.reading_id}, measured ${IST(e.measured_at)}${e.simulated ? ' · SIMULATED' : ''}`;
+  const L = e.sensors.layers, g = e.sensors.gas, bs = e.sensors.baseline_source;
+  const names = {top:'Top', mid:'Middle', bot:'Bottom', amb:'Outside (ambient)'};
+  const sensors = `<table><tr><th>Layer</th><th>Temp °C</th><th>RH %</th></tr>${Object.entries(names).map(([k, n]) =>
+      `<tr><td>${n}</td><td class="num">${fmt(L[k].t)}</td><td class="num">${fmt(L[k].rh)}</td></tr>`).join('')}</table>
+    <div class="muted" style="margin-top:6px">MQ-135 ${fmt(g.mq135_mv,0)} mV (baseline ${fmt(g.mq135_base_mv,0)}, ${esc(bs.mq135 || 'none')}) ·
+      MQ-136 ${fmt(g.mq136_mv,0)} mV (baseline ${fmt(g.mq136_base_mv,0)}, ${esc(bs.mq136 || 'none')})</div>`;
+
+  const S = e.score;
+  const score = `<table><tr><th>Component</th><th>Inputs → formula</th><th>0–100</th><th>Weight</th><th>Contribution</th></tr>${S.components.map(c =>
+      `<tr><td><b>${c.name}</b></td><td>${c.available ? esc(INPUTS[c.name](c.inputs)) : 'no valid data — left out, weights renormalised'}
+        <code class="f">${esc(c.formula)}</code></td><td class="num">${fmt(c.value)}</td>
+        <td class="num">${c.weight}${c.available && c.effective_weight !== c.weight ? ` → ${c.effective_weight}` : ''}</td>
+        <td class="num">${fmt(c.contribution)}</td></tr>`).join('')}</table>
+    <div style="margin-top:6px"><b>Score ${fmt(S.score)}</b> → <b>${S.level}</b>
+      <span class="muted">(SAFE &lt; ${S.thresholds.WATCH} ≤ WATCH &lt; ${S.thresholds.ROT} ≤ ROT)${S.worst_layer ? ' · worst layer: ' + S.worst_layer : ''}</span>
+      <code class="f">${esc(S.formula)}</code></div>`;
+
+  const P = e.price;
+  const PSUB = {'data.gov.in': 'Government data (data.gov.in / Agmarknet), fetched today',
+                'cache': 'Government data (data.gov.in / Agmarknet), CACHED from an earlier fetch',
+                'fallback': 'NOT live: manual fallback value from config, not shown to the farmer'};
+  const price = (P.source ? `<div><b>₹${Math.round(P.modal)}/quintal</b> · ${esc(P.market)} · arrival ${esc(P.arrival_date || 'n/a')}
+      · trend ${P.trend_pct === null || P.trend_pct === undefined ? 'unknown' : (P.trend_pct > 0 ? '+' : '') + P.trend_pct + '%'}
+      <span class="src ${esc(P.source)}">source: ${esc(P.source)}</span></div>
+      <div class="muted">fetched at ${P.fetched_at ? IST(P.fetched_at) : 'n/a (not from the API)'}</div>`
+      : '<div><b>No price available</b> — advice made without price</div>') +
+    `<code class="url">${esc(P.request.url)}</code><div class="muted">${esc(P.request.url_note)}${P.last_fetch && P.last_fetch.error ? ' · last fetch error: ' + esc(P.last_fetch.error) : ''}</div>`;
+
+  const R = e.rule;
+  const rule = `<div><span class="pill ${esc(R.severity)}" style="color:#fff">${esc(R.action)}</span> rule <b>${esc(R.rule)}</b></div>
+    <div style="margin-top:4px">${esc(R.why)}</div>`;
+
+  const N = e.notification;
+  const shown = N.sent ? N.message : e.message;   // if sent, show exactly what the farmer received
+  const msg = `<div style="font-size:16px;font-weight:bold">${esc(shown.text_mr)}</div><div class="muted">${esc(shown.text_en)}</div>
+    <div style="margin-top:8px"><b>${N.sent ? 'Message sent to farmer' : 'Not sent'}</b> — ${esc(N.reason)}</div>
+    ${N.sent && N.now_differs ? `<div class="gate"><span class="no">!</span> Sent with price ₹${esc(N.message.price ? Math.round(N.message.price.modal) : '—')}
+      (${esc(N.message.price ? N.message.price.source : 'none')}). Steps 3–4 show the price and rule evaluated <b>now</b>, which would say:
+      <span class="muted">${esc(e.message.text_en)}</span></div>` : ''}
+    ${N.checks.map(c => `<div class="gate"><span class="${c.passed ? 'ok' : 'no'}">${c.passed ? '✓' : '✗'}</span> ${esc(c.name)}: <span class="muted">${esc(c.detail)}</span></div>`).join('')}`;
+
+  $('whyflow').innerHTML = [
+    step(1, 'Sensors', 'raw values from this reading', sensors),
+    step(2, 'Rot-risk score', 'each component, its inputs and weight', score),
+    step(3, 'Mandi price', esc(PSUB[P.source] || 'no price available'), price),
+    step(4, 'Advisory rule', 'which rule fired and why', rule),
+    step(5, 'Message', N.sent ? 'what the farmer received' : 'what the farmer would receive', msg),
+  ].join(ARROW);
+}
+
+$('dev').addEventListener('change', e => { current = e.target.value; clearWhy('Loading…'); refresh(); });
 (async () => { await loadDevices(); await refresh(); setInterval(refresh, 5000); setInterval(loadDevices, 30000); })();
 </script>
 </body>

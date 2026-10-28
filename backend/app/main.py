@@ -18,7 +18,7 @@ from .config import settings
 from .db import DB
 from .models import DeviceMeta, FanCommand, ReadingIn, SimControl
 from .notify import Notifier
-from .price import PriceService
+from .price import PriceService, redacted_urls
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 # httpx logs every request URL at INFO: that would print the data.gov.in api-key and the Telegram bot token.
@@ -72,6 +72,38 @@ def _override(device_id: str) -> tuple[str, int]:
     return rows[0]["mode"], ttl
 
 
+def _price_snapshot(p: Optional[dict]) -> Optional[dict]:
+    keys = ("market", "modal", "source", "arrival_date", "fetched_at", "trend_pct")
+    return {k: p.get(k) for k in keys} if p else None
+
+
+FRESH_S = 300        # only readings younger than this may message the farmer (not a backlog flush)
+STABLE_N = 3         # debounce: risk level must be identical for this many readings in a row
+
+
+def _notify_gates(device_id: str, adv: advisory.Advice, age_s: int, upto_id: Optional[int] = None,
+                  as_of: Optional[datetime] = None) -> dict:
+    """Every condition that decides whether this reading messages the farmer. Used by ingest AND /explain.
+    upto_id / as_of replay the gates as they stood when that reading arrived (default: newest / now)."""
+    q = "SELECT risk_level FROM readings WHERE device_id=?" + (" AND id<=?" if upto_id else "") + " ORDER BY id DESC LIMIT ?"
+    recent = [x["risk_level"] for x in db.query(q, (device_id, upto_id, STABLE_N) if upto_id else (device_id, STABLE_N))]
+    stable = len(recent) == STABLE_N and len(set(recent)) == 1
+    allowed = not settings.notify_devices or device_id in settings.notify_devices
+    ok, why = notifier.check(device_id, adv, as_of)
+    checks = [
+        {"name": "fresh reading", "passed": age_s < FRESH_S,
+         "detail": f"measured {age_s}s before upload (must be < {FRESH_S}s; older = offline backlog flush)"},
+        {"name": "device allowed", "passed": allowed,
+         "detail": "NOTIFY_DEVICES is empty (all devices)" if not settings.notify_devices
+         else f"{device_id} {'is' if allowed else 'is not'} in NOTIFY_DEVICES"},
+        {"name": f"{STABLE_N}-reading debounce", "passed": stable,
+         "detail": f"last {len(recent)} risk levels (newest first): {', '.join(recent) or 'none'}"
+                   f" — must be {STABLE_N} identical"},
+        {"name": "advice changed or repeat interval passed", "passed": ok, "detail": why},
+    ]
+    return {"send": all(c["passed"] for c in checks), "checks": checks}
+
+
 @app.get("/health")
 def health():
     return {"ok": True, "time_utc": now_utc().isoformat()}
@@ -90,7 +122,7 @@ def ingest(r: ReadingIn, background: BackgroundTasks, x_device_token: Optional[s
     layers = r.layers.model_dump()
     risk = rotrisk.compute(layers, g)
 
-    db.execute(
+    cur = db.execute(
         "INSERT INTO readings(device_id, received_at, measured_at, top_t, top_rh, mid_t, mid_rh, bot_t, bot_rh, "
         "amb_t, amb_rh, mq135, mq136, mq135_base, mq136_base, fan_on, fan_mode, gas_alert, risk_score, risk_level, payload) "
         "VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -102,16 +134,11 @@ def ingest(r: ReadingIn, background: BackgroundTasks, x_device_token: Optional[s
     )
 
     # only notify on fresh readings (not on a backlog flush)
-    if r.age_s < 300:
+    if r.age_s < FRESH_S:
         price = prices.current()
         adv = advisory.decide(risk.level, price, risk.worst_layer)
-        allowed = not settings.notify_devices or r.device_id in settings.notify_devices
-        # debounce: only message the farmer once the risk level has held for 3 readings in a row
-        recent = [x["risk_level"] for x in db.query(
-            "SELECT risk_level FROM readings WHERE device_id=? ORDER BY id DESC LIMIT 3", (r.device_id,))]
-        stable = len(recent) == 3 and len(set(recent)) == 1
-        if allowed and stable and notifier.should_send(r.device_id, adv):
-            background.add_task(notifier.send, r.device_id, adv, is_sim(r.device_id))
+        if _notify_gates(r.device_id, adv, r.age_s)["send"]:
+            background.add_task(notifier.send, r.device_id, adv, is_sim(r.device_id), cur.lastrowid, _price_snapshot(price))
 
     mode, ttl = _override(r.device_id)
     return {"ok": True, "risk_score": risk.score, "risk_level": risk.level,
@@ -147,6 +174,79 @@ def latest(device_id: str):
         "price": price,
         "advice": {"action": adv.action, "text_mr": adv.text_mr, "text_en": adv.text_en, "severity": adv.severity},
         "last_notification": dict(last_n[0]) if last_n else None,
+    }
+
+
+@app.get("/api/v1/devices/{device_id}/explain")
+def explain(device_id: str):
+    """Full decision trace for the latest reading: Sensors -> Score -> Price -> Rule -> Message (+ notify gates).
+    Every value here comes from the same functions that make the real decision; nothing is re-derived."""
+    rows = db.query("SELECT * FROM readings WHERE device_id=? ORDER BY measured_at DESC LIMIT 1", (device_id,))
+    if not rows:
+        raise HTTPException(404, "no readings for this device")
+    row = rows[0]
+    layers, gas = _layers_gas(row)
+    try:
+        sent_payload = json.loads(row["payload"] or "{}")
+    except ValueError:
+        sent_payload = {}
+    dev_gas = sent_payload.get("gas") or {}
+    baseline_src = {s: None if gas[f"{s}_base_mv"] is None
+                    else ("device" if dev_gas.get(f"{s}_base_mv") is not None else "backend median of first 20 readings")
+                    for s in ("mq135", "mq136")}
+
+    risk = rotrisk.compute(layers, gas)
+    wsum = sum(rotrisk.WEIGHTS[k] for k in risk.components)
+    components = []
+    for name, weight in rotrisk.WEIGHTS.items():
+        val = risk.components.get(name)
+        eff = round(weight / wsum, 3) if val is not None else None
+        components.append({"name": name, "available": val is not None, "value": val, "weight": weight,
+                           "effective_weight": eff, "contribution": round(eff * val, 1) if val is not None else None,
+                           "formula": rotrisk.FORMULAS[name], "inputs": risk.inputs.get(name)})
+
+    price = prices.current()
+    lf = prices.last_fetch
+    if price and price["source"] in ("data.gov.in", "cache"):
+        ok_urls = [a["url"] for a in (lf or {}).get("attempts", []) if a["rows"]]
+        request = {"url": ok_urls[-1] if ok_urls else redacted_urls()[0],
+                   "url_note": "request that returned these rows" if ok_urls
+                   else "rows were fetched before the last server restart; this is the request the service sends"}
+    else:
+        request = {"url": redacted_urls()[0],
+                   "url_note": "DATAGOV_API_KEY not set; data.gov.in was not called" if not settings.datagov_api_key
+                   else "data.gov.in call did not return usable rows; see last_fetch"}
+    adv = advisory.decide(risk.level, price, risk.worst_layer)
+
+    age_s = int(sent_payload.get("age_s") or 0)
+    gates = _notify_gates(device_id, adv, age_s, upto_id=row["id"], as_of=datetime.fromisoformat(row["received_at"]))
+    sent = db.query("SELECT sent_at, action, text_mr, text_en, channel, price FROM notifications "
+                    "WHERE device_id=? AND reading_id=? ORDER BY id ASC LIMIT 1", (device_id, row["id"]))
+    if sent:
+        m = dict(sent[0])
+        m["price"] = json.loads(m["price"]) if m["price"] else None
+        differs = (m["action"], m["text_mr"]) != (adv.action, adv.text_mr)
+        notification = {"sent": True, "message": m, "now_differs": differs, "checks": gates["checks"],
+                        "reason": f"this reading triggered {m['action']}, sent {m['sent_at']} via {m['channel']}"
+                                  + ("; price has changed since, so the advice evaluated now differs" if differs else "")}
+    else:
+        failed = [c["name"] for c in gates["checks"] if not c["passed"]]
+        notification = {"sent": False, "message": None, "now_differs": False, "checks": gates["checks"],
+                        "reason": f"not sent: {', '.join(failed)} failed" if failed
+                        else "all gates pass; message is queued/sending for this reading"}
+
+    return {
+        "device_id": device_id, "simulated": is_sim(device_id), "reading_id": row["id"],
+        "measured_at": row["measured_at"], "received_at": row["received_at"], "evaluated_at": now_utc().isoformat(),
+        "sensors": {"layers": layers, "gas": gas, "baseline_source": baseline_src},
+        "score": {"components": components, "formula": rotrisk.FORMULAS["score"], "score": risk.score,
+                  "level": risk.level, "thresholds": {"WATCH": rotrisk.WATCH_AT, "ROT": rotrisk.ROT_AT},
+                  "worst_layer": risk.worst_layer, "reasons": risk.reasons},
+        "price": {**price, "request": request, "last_fetch": lf} if price
+        else {"source": None, "request": request, "last_fetch": lf},
+        "rule": {"action": adv.action, "severity": adv.severity, "rule": adv.rule, "why": adv.why},
+        "message": {"text_mr": adv.text_mr, "text_en": adv.text_en},
+        "notification": notification,
     }
 
 
