@@ -226,8 +226,11 @@ def explain(device_id: str):
         m = dict(sent[0])
         m["price"] = json.loads(m["price"]) if m["price"] else None
         differs = (m["action"], m["text_mr"]) != (adv.action, adv.text_mr)
+        manual = not gates["send"]   # sent although an automatic gate fails -> it came from the admin /notify button
         notification = {"sent": True, "message": m, "now_differs": differs, "checks": gates["checks"],
-                        "reason": f"this reading triggered {m['action']}, sent {m['sent_at']} via {m['channel']}"
+                        "reason": (f"{m['action']} sent manually (admin /notify) {m['sent_at']} via {m['channel']}; "
+                                   "the automatic gates below did not all pass" if manual else
+                                   f"this reading triggered {m['action']}, sent {m['sent_at']} via {m['channel']}")
                                   + ("; price has changed since, so the advice evaluated now differs" if differs else "")}
     else:
         failed = [c["name"] for c in gates["checks"] if not c["passed"]]
@@ -274,7 +277,8 @@ def notify_now(device_id: str, x_admin_token: Optional[str] = Header(default=Non
     require(x_admin_token, settings.admin_token)
     data = latest(device_id)
     adv = advisory.Advice(**{k: data["advice"][k] for k in ("action", "text_mr", "text_en", "severity")})
-    channel = notifier.send(device_id, adv, is_sim(device_id))
+    rid = db.query("SELECT id FROM readings WHERE device_id=? ORDER BY measured_at DESC LIMIT 1", (device_id,))[0]["id"]
+    channel = notifier.send(device_id, adv, is_sim(device_id), rid, _price_snapshot(data["price"]))
     return {"ok": True, "channel": channel, "advice": data["advice"]}
 
 

@@ -188,3 +188,27 @@ def test_cached_price_shows_its_date_not_today():                       # H3
     a = advisory.decide("SAFE", {"market": "Lasalgaon", "modal": 2400, "source": "cache",
                                  "arrival_date": "2026-10-20", "trend_pct": 0})
     assert "Today" not in a.text_en and "20-10-2026" in a.text_en and "20-10-2026" in a.text_mr and "आजचा" not in a.text_mr
+
+
+def test_telegram_error_never_logs_bot_token(monkeypatch, caplog):      # C1 (Telegram half)
+    from app import notify
+    token = "123456:SECRET-bot-token_xyz"
+    monkeypatch.setattr(settings, "telegram_token", token)
+    monkeypatch.setattr(settings, "telegram_chat_id", "42")
+    monkeypatch.setattr(settings, "notify_voice", False)
+    real = httpx.Client
+    monkeypatch.setattr(notify.httpx, "Client",
+                        lambda **kw: real(transport=httpx.MockTransport(lambda req: httpx.Response(401, json={}))))
+    caplog.set_level(logging.DEBUG)
+    adv = advisory.decide("SAFE", None)
+    assert main.notifier.send("KR-E10", adv) == "console(telegram-failed)"
+    assert token not in caplog.text and quote(token, safe="") not in caplog.text
+    assert "HTTP 401 from Telegram" in caplog.text
+
+
+def test_manual_notify_is_shown_as_sent(notify_all):                    # H2 (manual /notify path)
+    c.post("/api/v1/readings", json=body("KR-E11"), headers=H)          # 1 reading: debounce fails, no auto send
+    assert c.post("/api/v1/devices/KR-E11/notify", headers={"X-Admin-Token": "admin-token"}).status_code == 200
+    n = c.get("/api/v1/devices/KR-E11/explain").json()["notification"]
+    assert n["sent"] is True and n["message"]["action"] == "SORT_SELL"
+    assert n["message"]["price"]["source"] == "fallback" and "manual" in n["reason"]

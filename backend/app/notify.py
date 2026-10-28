@@ -6,6 +6,7 @@ import tempfile
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 
@@ -26,6 +27,17 @@ def make_voice(text_mr: str) -> Optional[Path]:
     except Exception as e:
         log.warning("voice generation failed: %s", e)
         return None
+
+
+def describe_telegram_error(e: Exception) -> str:
+    """Safe one-line error: Telegram URLs carry the bot token (api.telegram.org/bot<TOKEN>/...)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return f"HTTP {e.response.status_code} from Telegram"
+    text = f"{type(e).__name__}: {e}"
+    tok = settings.telegram_token
+    for form in ({tok, quote(tok, safe="")} if tok else set()):
+        text = text.replace(form, "REDACTED")
+    return text
 
 
 class Notifier:
@@ -78,7 +90,7 @@ class Notifier:
                                        "title": "कांदा रक्षक सल्ला"}, files={"audio": fh}).raise_for_status()
                 channel = "telegram"
             except Exception as e:
-                log.warning("telegram failed: %s", e)
+                log.warning("telegram failed: %s", describe_telegram_error(e))
                 channel = "console(telegram-failed)"
         self.db.execute(
             "INSERT INTO notifications(device_id, sent_at, action, text_mr, text_en, channel, reading_id, price) "
