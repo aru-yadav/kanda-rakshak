@@ -77,3 +77,7 @@ pio run && pio run -t upload && pio device monitor
 - [ ] Dashboard shows device, layers, fan state, risk, price, advice
 - [ ] 2–3 min video uploaded (unlisted), link in deck
 - [ ] Deck updated: stage = Working Prototype, prototype photo, real graph
+
+
+## Company policy
+Also follow docs/PROJECT_INSTRUCTIONS.md. If it conflicts with this file, the stricter rule wins.
