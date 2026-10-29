@@ -3,8 +3,10 @@
 Run: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload   (from backend/)
 Docs: http://localhost:8000/docs
 """
+import asyncio
 import json
 import logging
+from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Optional
@@ -28,10 +30,29 @@ for _noisy in ("httpx", "httpcore"):
 DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard"
 
 settings.check_tokens()   # fail fast: never serve with public default tokens
-app = FastAPI(title="Kanda Rakshak API", version="0.1.0")
 db = DB(settings.db_path)
 prices = PriceService(db)
 notifier = Notifier(db)
+
+
+async def _price_refresher() -> None:
+    """data.gov.in can take 30 s; the ESP32 gives up after 5 s. So the fetch never runs inside a request:
+    once at startup, then every 3 h (10 min after a failure). Requests only read the cache."""
+    while True:
+        await asyncio.to_thread(prices.refresh, True)
+        await asyncio.sleep(prices.next_refresh_s())
+
+
+@asynccontextmanager
+async def lifespan(_: FastAPI):
+    task = asyncio.create_task(_price_refresher())
+    try:
+        yield
+    finally:
+        task.cancel()
+
+
+app = FastAPI(title="Kanda Rakshak API", version="0.1.0", lifespan=lifespan)
 
 
 def current_price() -> Optional[dict]:

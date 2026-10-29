@@ -22,5 +22,6 @@ os.environ["PRICE_FALLBACK_MARKET"] = "Lasalgaon"
 os.environ["DATAGOV_RESOURCE_ID"] = "9ef84268-d588-465a-a308-a864a43d0070"
 os.environ["PRICE_STATE"] = "Maharashtra"
 os.environ["PRICE_COMMODITY"] = "Onion"
+os.environ["PRICE_DISTRICT"] = "Nashik"
 os.environ["NOTIFY_VOICE"] = "true"
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))

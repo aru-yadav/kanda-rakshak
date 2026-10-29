@@ -18,6 +18,11 @@ from .db import DB
 
 log = logging.getLogger("price")
 API = "https://api.data.gov.in/resource/{rid}"
+# data.gov.in stalls requests with the default python-httpx User-Agent (curl answers in 0.4 s); send our own.
+HEADERS = {"User-Agent": "KandaRakshak/0.2 (+https://github.com/aru-yadav/kanda-rakshak)", "Accept": "application/json"}
+TIMEOUT = httpx.Timeout(30.0, connect=10.0)
+REFRESH_S = 3 * 3600          # background refresh interval
+RETRY_S = 10 * 60             # sooner retry after a failed fetch (e.g. no network at startup)
 
 
 def _num(v) -> Optional[float]:
@@ -54,14 +59,24 @@ def parse_records(records: list[dict], markets: list[str]) -> list[dict]:
     return out
 
 
+def norm_market(name: str) -> str:
+    """'APMC Lasalgaon ' -> 'lasalgaon'. Matching only; the original name is kept for display."""
+    n = (name or "").strip().lower()
+    return n[5:].strip() if n.startswith("apmc ") else n
+
+
 def pick_market(rows: list[dict], preferred: list[str]) -> Optional[dict]:
-    """Preferred market order first; otherwise the state median row. Pure, tested."""
+    """Preferred market order first (normalised name starts with or contains it, so 'Lasalgaon' matches
+    'Lasalgaon(Vinchur)' and 'APMC Lasalgaon'); otherwise the state median row. Pure, tested."""
     if not rows:
         return None
     latest = max(r["arrival_date"] for r in rows)
     today_rows = [r for r in rows if r["arrival_date"] == latest]
     for name in preferred:
-        hits = [r for r in today_rows if r["market"].lower().startswith(name.lower())]
+        want = norm_market(name)
+        if not want:
+            continue
+        hits = [r for r in today_rows if norm_market(r["market"]).startswith(want) or want in norm_market(r["market"])]
         if hits:
             return max(hits, key=lambda r: r["modal"])  # if several varieties, take the highest modal (usually main red onion)
     s = sorted(today_rows, key=lambda r: r["modal"])
@@ -90,11 +105,13 @@ def describe_error(e: Exception) -> str:
 
 
 def _params(key: str) -> list[dict]:
-    base = {"api-key": key, "format": "json", "limit": 500}
-    # The API has used both 'filters[state]' and 'filters[state.keyword]' styles; try both.
+    """Query variants in order; fetch_live stops at the first one that returns rows.
+    (a) our district (Nashik: Lasalgaon, Pimpalgaon, Chandwad...), small; (b) the whole state, wider."""
+    base = {"api-key": key, "format": "json"}
+    state = {"filters[state.keyword]": settings.price_state, "filters[commodity]": settings.price_commodity}
     return [
-        {**base, "filters[state.keyword]": settings.price_state, "filters[commodity]": settings.price_commodity},
-        {**base, "filters[state]": settings.price_state, "filters[commodity]": settings.price_commodity},
+        {**base, **state, "filters[district]": settings.price_district, "limit": 50},
+        {**base, **state, "limit": 200},
     ]
 
 
@@ -111,13 +128,13 @@ def fetch_live(client: Optional[httpx.Client] = None, trace: Optional[list] = No
     url = API.format(rid=settings.datagov_resource_id)
     shown = redacted_urls()
     own = client is None
-    client = client or httpx.Client(timeout=15)
+    client = client or httpx.Client(timeout=TIMEOUT)
     try:
         for i, params in enumerate(_params(settings.datagov_api_key)):
             step = {"url": shown[i], "status": None, "rows": 0}
             if trace is not None:
                 trace.append(step)
-            resp = client.get(url, params=params)
+            resp = client.get(url, params=params, headers=HEADERS)
             step["status"] = resp.status_code
             resp.raise_for_status()
             rows = parse_records(resp.json().get("records", []), settings.price_markets)
@@ -164,8 +181,10 @@ class PriceService:
         return round(100 * (modal - avg) / avg, 1) if avg else None
 
     def refresh(self, force: bool = False) -> None:
+        """Blocking network call. Runs from the background refresher (main.lifespan) or an explicit
+        /price?refresh=true, never from ingest or a dashboard read."""
         now = datetime.now(timezone.utc)
-        if not force and self._last_try and (now - self._last_try).total_seconds() < 3 * 3600:
+        if not force and self._last_try and (now - self._last_try).total_seconds() < REFRESH_S:
             return
         self._last_try = now
         attempts: list[dict] = []
@@ -180,8 +199,12 @@ class PriceService:
             self.last_fetch["error"] = describe_error(e)
             log.warning("price fetch failed: %s", self.last_fetch["error"])
 
+    def next_refresh_s(self) -> int:
+        """Seconds until the background refresher should try again: sooner after a failed fetch."""
+        return REFRESH_S if self.last_fetch and self.last_fetch["ok"] else RETRY_S
+
     def current(self) -> Optional[dict]:
-        self.refresh()
+        """Cache (or fallback) only: no network, so it is safe inside any request."""
         c = self._from_cache()
         if c:
             today = datetime.now(timezone.utc).date().isoformat()

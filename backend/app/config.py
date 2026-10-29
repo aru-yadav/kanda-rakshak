@@ -27,6 +27,7 @@ class Settings:
         self.datagov_resource_id = _get("DATAGOV_RESOURCE_ID", "9ef84268-d588-465a-a308-a864a43d0070")
         self.price_state = _get("PRICE_STATE", "Maharashtra")
         self.price_commodity = _get("PRICE_COMMODITY", "Onion")
+        self.price_district = _get("PRICE_DISTRICT", "Nashik")
         self.price_markets = [m.strip() for m in _get("PRICE_MARKETS", "Lasalgaon").split(",") if m.strip()]
         fb = _get("PRICE_FALLBACK_MODAL")
         self.price_fallback_modal = float(fb) if fb else None
