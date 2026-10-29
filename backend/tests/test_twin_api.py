@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 c = TestClient(app)
-H = {"X-Device-Token": "dev-token"}
+H = {"X-Device-Token": "test-device-token-0123456789"}
 
 
 def reading(dev, rh=60, mq=400):

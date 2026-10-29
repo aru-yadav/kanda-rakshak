@@ -1,8 +1,10 @@
 """Kanda Rakshak digital twin: virtual onion sheds that behave like real ones.
 
-Each virtual shed runs a simple physics model of a stored onion heap (humidity, heat,
-rot spread, rot gas) plus the SAME fan rule as the firmware, and posts readings to the
-real backend exactly like an ESP32 would. All device IDs start with SIM- and every
+Each virtual shed runs a simple model of a stored onion heap (humidity, heat, rot spread,
+rot gas) with ASSUMED coefficients (not calibrated on field data), plus a fan rule modelled
+on the firmware's decideFan() (not yet verified by shared test vectors: the twin uses the
+bottom layer temperature and a 30 sim-min hold), and posts readings to the real backend like
+an ESP32 would. Time is compressed (default 30 sim-min per 2 s tick, about 900x). All device IDs start with SIM- and every
 screen labels them SIMULATED. Use this to demo the software while hardware is built.
 
 Scenario / offline / kit on-off for each shed are controlled live from the dashboard.
@@ -13,6 +15,7 @@ Options: --interval 2 (real seconds per tick)  --minutes 30 (simulated minutes p
 """
 import argparse
 import math
+import os
 import random
 import time
 from dataclasses import dataclass, field
@@ -74,7 +77,7 @@ class Shed:
         amb_t, amb_rh = self.ambient()
         heap_rh = max(self.rh.values())
         heap_t = self.layer_t("bot", amb_t)
-        # --- fan rule: identical logic to firmware decideFan() ---
+        # --- fan rule: modelled on firmware decideFan(); differences listed in the module docstring ---
         if self.kit_on:
             drier, cooler = amb_rh < heap_rh - 5, amb_t < heap_t - 1.5
             want_on = (heap_rh > 78 and drier) or (heap_t > 30 and cooler)
@@ -118,11 +121,13 @@ class Shed:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="http://localhost:8000")
-    ap.add_argument("--token", default="change-me-same-as-firmware-secrets")
+    ap.add_argument("--token", default=os.environ.get("DEVICE_TOKEN"), help="DEVICE_TOKEN from backend/.env")
     ap.add_argument("--interval", type=float, default=2.0, help="real seconds per tick")
     ap.add_argument("--minutes", type=float, default=30.0, help="simulated minutes per tick")
     ap.add_argument("--sheds", type=int, default=len(SHEDS))
     a = ap.parse_args()
+    if not a.token:
+        ap.error("pass --token (DEVICE_TOKEN from backend/.env) or set DEVICE_TOKEN")
     H = {"X-Device-Token": a.token}
     sheds: dict[str, Shed] = {}
     with httpx.Client(timeout=10) as c:

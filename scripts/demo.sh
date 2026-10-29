@@ -6,7 +6,8 @@ cd "$(dirname "$0")/.."
 [ -d backend/.venv ] || ./scripts/setup.sh
 source backend/.venv/bin/activate
 TOKEN=$(grep -E '^DEVICE_TOKEN=' backend/.env | cut -d= -f2-)
-( cd backend && uvicorn app.main:app --host 0.0.0.0 --port 8000 ) &
+# localhost only: with DEMO_MODE on, anyone who can reach the server could drive the simulated sheds
+( cd backend && DEMO_MODE=true uvicorn app.main:app --host 127.0.0.1 --port 8000 ) &
 API=$!
 trap 'kill $API 2>/dev/null' EXIT
 sleep 3

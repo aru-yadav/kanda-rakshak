@@ -41,21 +41,37 @@ class Advice:
     why: str = ""   # that branch's condition filled in with the actual inputs
 
 
+def price_view(price: Optional[dict], today: Optional[date] = None) -> dict:
+    """How a price may be labelled on ANY screen or message. The only place this is decided.
+    kind: today (live data.gov.in, arrival today IST) | dated (Agmarknet, older arrival) | not_live (config fallback
+    or undated) | none. farmer_visible: whether the farmer may be shown this number at all."""
+    if not price or price.get("modal") is None:
+        return {"kind": "none", "farmer_visible": False, "date": None,
+                "heading_en": "No mandi price available", "heading_mr": "भाव उपलब्ध नाही"}
+    arrival, source = price.get("arrival_date"), price.get("source")
+    if source not in ("data.gov.in", "cache") or not arrival:
+        return {"kind": "not_live", "farmer_visible": False, "date": None,
+                "heading_en": "NOT LIVE: manual fallback value from config, not from Agmarknet",
+                "heading_mr": "भाव उपलब्ध नाही"}
+    today = today or datetime.now(IST).date()
+    d = date.fromisoformat(arrival).strftime("%d-%m-%Y")
+    if source == "data.gov.in" and arrival == today.isoformat():
+        return {"kind": "today", "farmer_visible": True, "date": d,
+                "heading_en": "Today's mandi price (Govt Agmarknet, data.gov.in)", "heading_mr": "आजचा कांदा भाव"}
+    return {"kind": "dated", "farmer_visible": True, "date": d,
+            "heading_en": f"Mandi price on {d} (Govt Agmarknet, {source})", "heading_mr": f"{d} रोजीचा कांदा भाव"}
+
+
 def _price_bits(price: Optional[dict], today: Optional[date] = None) -> tuple[str, str]:
-    """Price sentence for the farmer. Live today -> "today's rate"; cached -> "rate on <date>";
-    fallback / undated -> no price at all (a config value must never reach a farmer as a mandi rate)."""
-    if not price or price.get("modal") is None or price.get("source") not in ("data.gov.in", "cache"):
-        return "", ""
-    arrival = price.get("arrival_date")
-    if not arrival:
+    """Price sentence for the farmer, worded per price_view(). Not farmer-visible -> no price at all."""
+    v = price_view(price, today)
+    if not v["farmer_visible"]:
         return "", ""
     p = int(round(price["modal"]))
     m = price.get("market", "")
-    today = today or datetime.now(IST).date()
-    if price["source"] == "data.gov.in" and arrival == today.isoformat():
+    if v["kind"] == "today":
         return f" आजचा {market_mr(m)} भाव ₹{p}/क्विंटल.", f" Today's {m} rate ₹{p}/quintal."
-    d = date.fromisoformat(arrival).strftime("%d-%m-%Y")
-    return f" {d} रोजीचा {market_mr(m)} भाव ₹{p}/क्विंटल.", f" {m} rate on {d}: ₹{p}/quintal."
+    return f" {v['date']} रोजीचा {market_mr(m)} भाव ₹{p}/क्विंटल.", f" {m} rate on {v['date']}: ₹{p}/quintal."
 
 
 def decide(level: str, price: Optional[dict], worst_layer: Optional[str] = None) -> Advice:

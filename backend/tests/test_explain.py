@@ -10,7 +10,7 @@ from app import advisory, main, price as price_mod
 from app.config import settings
 
 c = TestClient(main.app)
-H = {"X-Device-Token": "dev-token"}
+H = {"X-Device-Token": "test-device-token-0123456789"}
 SECRET = "SECRET-KEY-must-never-appear-123"
 
 
@@ -208,7 +208,7 @@ def test_telegram_error_never_logs_bot_token(monkeypatch, caplog):      # C1 (Te
 
 def test_manual_notify_is_shown_as_sent(notify_all):                    # H2 (manual /notify path)
     c.post("/api/v1/readings", json=body("KR-E11"), headers=H)          # 1 reading: debounce fails, no auto send
-    assert c.post("/api/v1/devices/KR-E11/notify", headers={"X-Admin-Token": "admin-token"}).status_code == 200
+    assert c.post("/api/v1/devices/KR-E11/notify", headers={"X-Admin-Token": "test-admin-token-0123456789"}).status_code == 200
     n = c.get("/api/v1/devices/KR-E11/explain").json()["notification"]
     assert n["sent"] is True and n["message"]["action"] == "SORT_SELL"
     assert n["message"]["price"]["source"] == "fallback" and "manual" in n["reason"]

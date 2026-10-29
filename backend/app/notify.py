@@ -2,7 +2,9 @@
 Production: DLT-registered SMS + IVR (see docs/TECH_STACK.md)."""
 import json
 import logging
+import os
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
@@ -17,16 +19,32 @@ from .db import DB
 log = logging.getLogger("notify")
 
 
-def make_voice(text_mr: str) -> Optional[Path]:
+MIN_MP3_BYTES = 1024   # anything smaller is a truncated / failed TTS download
+
+
+def tts_to_file(text_mr: str, target: Path) -> bool:
+    """Marathi TTS into `target`, atomically: render to a private temp file, check it, then rename.
+    A failed or partial download never lands at `target` (gTTS opens its output file before streaming)."""
+    if target.exists() and target.stat().st_size >= MIN_MP3_BYTES:
+        return True
+    part = target.with_name(f".{target.name}.{uuid.uuid4().hex}.part")
     try:
         from gtts import gTTS
-        f = Path(tempfile.gettempdir()) / f"kr_voice_{abs(hash(text_mr))}.mp3"
-        if not f.exists():
-            gTTS(text=text_mr, lang="mr").save(str(f))
-        return f
+        gTTS(text=text_mr, lang="mr").save(str(part))
+        if part.stat().st_size < MIN_MP3_BYTES:
+            raise IOError(f"TTS output only {part.stat().st_size} bytes")
+        os.replace(part, target)
+        return True
     except Exception as e:
-        log.warning("voice generation failed: %s", e)
-        return None
+        log.warning("voice generation failed: %s", type(e).__name__)
+        return False
+    finally:
+        part.unlink(missing_ok=True)
+
+
+def make_voice(text_mr: str) -> Optional[Path]:
+    f = Path(tempfile.gettempdir()) / f"kr_voice_{abs(hash(text_mr))}.mp3"
+    return f if tts_to_file(text_mr, f) else None
 
 
 def describe_telegram_error(e: Exception) -> str:

@@ -3,7 +3,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 
 c = TestClient(app)
-H = {"X-Device-Token": "dev-token"}
+H = {"X-Device-Token": "test-device-token-0123456789"}
 
 
 def body(device="KR-T1", rh=60, mq=400, base=400):
@@ -37,7 +37,7 @@ def test_sim_device_flagged():
 
 def test_fan_override_requires_admin_and_is_returned():
     assert c.post("/api/v1/devices/KR-T3/fan", json={"mode": "on"}).status_code == 401
-    ok = c.post("/api/v1/devices/KR-T3/fan", json={"mode": "on", "ttl_s": 60}, headers={"X-Admin-Token": "admin-token"})
+    ok = c.post("/api/v1/devices/KR-T3/fan", json={"mode": "on", "ttl_s": 60}, headers={"X-Admin-Token": "test-admin-token-0123456789"})
     assert ok.status_code == 200
     r = c.post("/api/v1/readings", json=body("KR-T3"), headers=H).json()
     assert r["fan_override"] == "on" and 0 < r["override_ttl_s"] <= 60

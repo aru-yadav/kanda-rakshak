@@ -42,11 +42,14 @@ class FanCommand(BaseModel):
     ttl_s: int = Field(default=600, ge=30, le=24 * 3600)
 
 
+NAME_RE = r"^[\w .,'()-]*$"   # \w is Unicode: covers Devanagari letters and vowel signs; no < > & " etc.
+
+
 class DeviceMeta(BaseModel):
     device_id: str = Field(min_length=2, max_length=32, pattern=r"^[A-Za-z0-9_-]+$")
-    farmer: Optional[str] = Field(default=None, max_length=60)
-    village: Optional[str] = Field(default=None, max_length=60)
-    taluka: Optional[str] = Field(default=None, max_length=60)
+    farmer: Optional[str] = Field(default=None, max_length=60, pattern=NAME_RE)
+    village: Optional[str] = Field(default=None, max_length=60, pattern=NAME_RE)
+    taluka: Optional[str] = Field(default=None, max_length=60, pattern=NAME_RE)
     lat: Optional[float] = Field(default=None, ge=-90, le=90)
     lon: Optional[float] = Field(default=None, ge=-180, le=180)
     tonnes: Optional[float] = Field(default=None, ge=0, le=10000)

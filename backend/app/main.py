@@ -17,7 +17,7 @@ from . import advisory, rotrisk
 from .config import settings
 from .db import DB
 from .models import DeviceMeta, FanCommand, ReadingIn, SimControl
-from .notify import Notifier
+from .notify import Notifier, tts_to_file
 from .price import PriceService, redacted_urls
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -27,10 +27,17 @@ for _noisy in ("httpx", "httpcore"):
 
 DASHBOARD = Path(__file__).resolve().parents[2] / "dashboard"
 
+settings.check_tokens()   # fail fast: never serve with public default tokens
 app = FastAPI(title="Kanda Rakshak API", version="0.1.0")
 db = DB(settings.db_path)
 prices = PriceService(db)
 notifier = Notifier(db)
+
+
+def current_price() -> Optional[dict]:
+    """The price plus how it may be labelled (advisory.price_view): every screen uses this, never its own wording."""
+    p = prices.current()
+    return {**p, "view": advisory.price_view(p)} if p else None
 
 
 def now_utc() -> datetime:
@@ -135,7 +142,7 @@ def ingest(r: ReadingIn, background: BackgroundTasks, x_device_token: Optional[s
 
     # only notify on fresh readings (not on a backlog flush)
     if r.age_s < FRESH_S:
-        price = prices.current()
+        price = current_price()
         adv = advisory.decide(risk.level, price, risk.worst_layer)
         if _notify_gates(r.device_id, adv, r.age_s)["send"]:
             background.add_task(notifier.send, r.device_id, adv, is_sim(r.device_id), cur.lastrowid, _price_snapshot(price))
@@ -160,7 +167,7 @@ def latest(device_id: str):
     row = rows[0]
     layers, gas = _layers_gas(row)
     risk = rotrisk.compute(layers, gas)
-    price = prices.current()
+    price = current_price()
     adv = advisory.decide(risk.level, price, risk.worst_layer)
     last_n = db.query("SELECT * FROM notifications WHERE device_id=? ORDER BY id DESC LIMIT 1", (device_id,))
     mode, ttl = _override(device_id)
@@ -205,7 +212,7 @@ def explain(device_id: str):
                            "effective_weight": eff, "contribution": round(eff * val, 1) if val is not None else None,
                            "formula": rotrisk.FORMULAS[name], "inputs": risk.inputs.get(name)})
 
-    price = prices.current()
+    price = current_price()
     lf = prices.last_fetch
     if price and price["source"] in ("data.gov.in", "cache"):
         ok_urls = [a["url"] for a in (lf or {}).get("attempts", []) if a["rows"]]
@@ -286,7 +293,7 @@ def notify_now(device_id: str, x_admin_token: Optional[str] = Header(default=Non
 def price(refresh: bool = False):
     if refresh:
         prices.refresh(force=True)
-    p = prices.current()
+    p = current_price()
     if not p:
         raise HTTPException(503, "no price available: set DATAGOV_API_KEY or PRICE_FALLBACK_MODAL")
     return p
@@ -347,7 +354,7 @@ def fleet():
     out = []
     devs = db.query("SELECT device_id, MAX(received_at) AS last_seen FROM readings GROUP BY device_id")
     metas = {m["device_id"]: dict(m) for m in db.query("SELECT * FROM device_meta")}
-    price = prices.current()
+    price = current_price()
     for d in devs:
         rows = db.query("SELECT * FROM readings WHERE device_id=? ORDER BY measured_at DESC LIMIT 1", (d["device_id"],))
         row = rows[0]
@@ -385,12 +392,8 @@ def voice(device_id: str):
     text = data["advice"]["text_mr"]
     AUDIO_DIR.mkdir(parents=True, exist_ok=True)
     f = AUDIO_DIR / (hashlib.sha1(text.encode()).hexdigest()[:16] + ".mp3")
-    if not f.exists():
-        try:
-            from gtts import gTTS
-            gTTS(text=text, lang="mr").save(str(f))
-        except Exception as e:  # no internet / gTTS blocked
-            raise HTTPException(503, f"voice unavailable: {e}")
+    if not tts_to_file(text, f):   # no internet / gTTS blocked; nothing partial is cached
+        raise HTTPException(503, "voice unavailable (TTS failed; see server log)")
     return FileResponse(f, media_type="audio/mpeg")
 
 
