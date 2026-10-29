@@ -5,7 +5,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BACKEND_DIR = Path(__file__).resolve().parents[1]
-load_dotenv(BACKEND_DIR / ".env")
+if os.environ.get("KR_NO_DOTENV") != "1":   # tests set this so a developer's backend/.env never changes results
+    load_dotenv(BACKEND_DIR / ".env")
 
 
 def _get(name: str, default: str = "") -> str:
