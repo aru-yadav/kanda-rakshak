@@ -71,7 +71,9 @@ def _price_bits(price: Optional[dict], today: Optional[date] = None) -> tuple[st
     m = price.get("market", "")
     if v["kind"] == "today":
         return f" आजचा {market_mr(m)} भाव ₹{p}/क्विंटल.", f" Today's {m} rate ₹{p}/quintal."
-    return f" {v['date']} रोजीचा {market_mr(m)} भाव ₹{p}/क्विंटल.", f" {m} rate on {v['date']}: ₹{p}/quintal."
+    old_mr, old_en = (" (जुना भाव)", " (old rate)") if price.get("source") == "cache" else ("", "")
+    return (f" {v['date']} रोजीचा {market_mr(m)} भाव ₹{p}/क्विंटल{old_mr}.",
+            f" {m} rate on {v['date']}: ₹{p}/quintal{old_en}.")
 
 
 def decide(level: str, price: Optional[dict], worst_layer: Optional[str] = None) -> Advice:

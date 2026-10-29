@@ -60,3 +60,19 @@ def test_live_price_today_is_todays_rate():
 def test_live_price_from_earlier_day_shows_date():
     a = decide("SAFE", {**P, "arrival_date": "2026-10-27"})
     assert "Today" not in a.text_en and "27-10-2026" in a.text_en
+
+
+def test_cached_price_marked_old_in_marathi():                         # approved wording, Latin-digit date
+    a = decide("SAFE", {**P, "source": "cache", "arrival_date": "2026-10-28", "modal": 1500})
+    assert "28-10-2026 रोजीचा लासलगाव भाव ₹1500/क्विंटल (जुना भाव)." in a.text_mr
+    assert "(old rate)" in a.text_en and "Today" not in a.text_en
+
+
+def test_live_dated_price_has_no_old_marker():
+    a = decide("SAFE", {**P, "arrival_date": "2026-10-28", "modal": 1500})
+    assert "28-10-2026 रोजीचा लासलगाव भाव ₹1500/क्विंटल." in a.text_mr and "जुना" not in a.text_mr
+
+
+def test_fallback_price_never_in_farmer_message():
+    a = decide("SAFE", {**P, "source": "fallback", "arrival_date": None, "modal": 1850})
+    assert "1850" not in a.text_mr and "1850" not in a.text_en and "भाव" not in a.text_mr
