@@ -19,7 +19,7 @@ The farmer also doesn't know when to sell. If he sells too early he gets a low p
 1. **It feels:** a stick pushed into the pile measures how hot and how wet it is at the top, middle and bottom. A gas sensor smells rot before a human can.
 2. **It acts:** if the pile is wet and the air outside is drier, it switches on a fan by itself. No phone or internet is needed for this.
 3. **It thinks:** it checks today's onion price at the mandi using Government data.
-4. **It tells:** every day it gives the farmer one simple instruction in Marathi, as a voice call or SMS on any phone: **थांबा (Hold), निवडा (Sort) or विका (Sell).**
+4. **It tells:** every day it gives the farmer one simple instruction in Marathi: **थांबा (Hold), निवडा (Sort) or विका (Sell).** In our demo, it arrives on Telegram as text and voice. In production, the farmer will get it as an SMS or voice call on any phone.
 
 ### One line for the jury
 
@@ -32,13 +32,13 @@ The farmer also doesn't know when to sell. If he sells too early he gets a low p
 | Backend: data intake, rot-risk engine, Hold/Sort/Sell advice in Marathi | **Built and tested** (automated tests) |
 | Live mandi price from the Government Agmarknet API (data.gov.in) | **Working**, with date and source shown |
 | Farmer phone app, shed dashboard, department/FPO dashboard | **Built** |
-| Messages to the farmer's phone (Telegram in the demo; SMS and voice call in production) | **Working in the demo** |
-| Digital twin: 8 virtual sheds around Nashik that behave like real ones | **Running**, uses the same fan logic as the device |
-| ESP32 firmware (sensors, fan control, offline buffer) | **Written**, hardware being assembled |
+| Messages to the farmer's phone | **Telegram working in demo; SMS and voice call planned (production)** |
+| Digital twin: 8 virtual sheds around Nashik | **Running**. Fan rule modelled on our firmware fan rule (not yet verified against it); heap behaviour uses assumed values, to be calibrated in the pilot |
+| ESP32 firmware (sensors, fan control, offline buffer) | **Written, compile pending**; hardware being assembled |
 | Hardware kit | **Designed**, parts list and wiring done |
 | Field pilot | **Proposed**: 80 sheds, Niphad–Lasalgaon |
 
-**Why a digital twin?** "Rot takes weeks to happen in a real shed. We built a physics model of an onion heap so we could test every situation (humid monsoon, rot starting, network cut) in minutes. When the hardware is installed, the same software takes real readings with zero changes. The device sends exactly the same data format."
+**Why a digital twin?** "Rot takes weeks to happen in a real shed. We built a simple model of an onion heap so we could test every situation (humid monsoon, rot starting, network cut) in minutes. Its fan rule is modelled on our firmware fan rule (not yet verified against it), and the heap behaviour uses assumed values that we will calibrate in the pilot. When the hardware is installed, the same software takes real readings with zero changes. The device sends exactly the same data format."
 
 ---
 
@@ -56,24 +56,27 @@ ESP32 controller ── decides fan ON/OFF itself (works with no network)
 Our server (FastAPI, Python) ── stores the reading (SQLite database)
    │
    ├── Rot-risk engine → score 0–100 → SAFE / WATCH / ROT
-   ├── Price service  → today's onion price from data.gov.in (Agmarknet)
+   ├── Price service  → latest onion price from data.gov.in (Agmarknet), with its date
    └── Advice rules   → one action: Hold / Sort / Sell, in Marathi + English
            │
            ▼
-   Farmer: SMS + voice call (any phone)    Dashboard: FPO / Agriculture Dept
+   Farmer: Telegram text + voice (demo)    Dashboard: FPO / Agriculture Dept
+           SMS + voice call (planned)
 ```
 
 ### 2. How exactly do you fetch the mandi price?
 
 - **Source:** the Government of India Open Government Data platform (**data.gov.in**), dataset *"Current Daily Price of Various Commodities from Various Markets (Mandi)"*, published from **Agmarknet**. APMC mandis upload their daily arrivals and prices there.
 - **How:** it's a free public **REST API**. We register for an API key and our server makes an HTTPS GET request:
-  `api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=…&format=json&filters[state]=Maharashtra&filters[commodity]=Onion`
+  `api.data.gov.in/resource/9ef84268-d588-465a-a308-a864a43d0070?api-key=…&format=json&filters[state.keyword]=Maharashtra&filters[district]=Nashik&filters[commodity]=Onion&limit=50`
+  - First we ask for **Nashik district** only. If that returns nothing, we ask for the **whole state** (limit 200).
+  - Every request carries **our own User-Agent** (`KandaRakshak/0.2`), because the server stalls default Python clients.
 - **What comes back:** JSON rows with market, variety, arrival date, and min, max and modal price in ₹ per quintal.
 - **What we do with it:**
-  - We pick **Lasalgaon** first (Asia's biggest onion market), then Pimpalgaon. If neither reported today, we use the state median.
+  - We pick **Lasalgaon** first (Asia's biggest onion market), then Pimpalgaon. Market names come back in different forms ("Lasalgaon(Vinchur)", "APMC Pimpalgaon Baswant "), so we compare normalised names. If neither reported, we use the median of the markets that did.
   - We store every row in our database, so we build our own price history.
-  - **Trend** = today's price compared with the average of the last 7 days we stored.
-- **When:** at most once every 3 hours. Mandis publish once a day, so more often is pointless.
+  - **Trend** = today vs average of the last 7 price days we stored.
+- **When:** refreshed in the background every 3 hours (and 10 minutes after a failed try). Mandis publish once a day, so more often is pointless. The device's uploads never wait for the price server.
 - **If the API is down:** we use the last stored price, and the screen says **"cache"** with its date. We never show an old price as today's. Every price on screen carries its **source and date**.
 
 ### 3. How does the farmer get the message?
@@ -149,7 +152,7 @@ Fans are small **12 V DC** fans that can run on a **solar panel and battery**, s
 Three layers:
 1. **Fan control runs on the ESP32 itself.** It reads the sensors and decides with no network. The onions are protected even if the internet is down for days.
 2. **Readings are stored on the device** and uploaded when the network comes back, so no data is lost. Our demo shows this with the "Cut network" button.
-3. **The farmer needs no internet at all.** He receives an SMS or voice call, which works on a basic phone over 2G.
+3. **In production, the farmer needs no internet at all.** He will get an SMS or voice call, which works on a basic phone over 2G. (In our demo, on Telegram.)
 
 The device connects over WiFi in the demo. In the field it uses a **4G/2G SIM module**. For villages with many sheds, a LoRa radio can send data to one shared gateway at the FPO.
 
@@ -159,7 +162,7 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 
 ### 11. What does the kit cost and who pays?
 
-- About **₹7,600** per kit (ESP32, 4 sensors, 2 gas sensors, fan, solar, enclosure).
+- About **₹7,900** per kit (ESP32, 4 sensors, 2 gas sensors, fan, solar, enclosure).
 - Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at ₹15/kg is about ₹75,000 in one season. **This is a target, to be measured in the pilot.**
 - **Who pays:**
   - Government: add the kit to the existing onion-storage (kanda chawl) subsidy schemes, so every new subsidised shed is also smart.
@@ -173,20 +176,20 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
   1. sensors at three depths inside the onion heap, plus rot gas;
   2. a **decision** (Hold/Sort/Sell) using the live Government price, not just a graph;
   3. the fan works **offline** on the device;
-  4. **Marathi voice on any phone**, so there's no app and no literacy needed;
+  4. **Marathi advice by voice**: on Telegram in the demo, and planned as SMS/voice call on any phone, so no app and no literacy needed;
   5. a **retrofit** to sheds that already exist, including Government-subsidised ones;
   6. a dashboard for the **Agriculture Department** showing stock at risk across the district.
 
 ### 13. What is the "digital twin" exactly? Is the data fake?
 
-- It's a **computer model of an onion shed**: how humidity rises and falls with outside weather, how rot spreads when it's too wet, how much gas rotting onion releases, and the **exact same fan rule** as our ESP32.
+- It's a **computer model of an onion shed**: how humidity rises and falls with outside weather, how rot spreads when it's too wet, and how much gas rotting onion releases. These use **assumed values, to be calibrated in the pilot**. Its fan rule is **modelled on our firmware fan rule (not yet verified against it)**.
 - It sends data to our server in exactly the format the real device will.
 - Every simulated shed has an ID starting with **SIM-** and is labelled **SIMULATED** on every screen. We never present it as field data.
 - **Answer:** "Yes, the shed data is simulated, and we label it everywhere. The software, the Government price feed and the messages are real. The twin lets us prove the logic before the hardware is in a real shed."
 
 ### 14. Data privacy and security?
 
-- Each device has its own secret token. The server rejects data without it.
+- The server rejects data without a secret device token. All kits share one device token in this prototype; per-device tokens are planned before the pilot.
 - We store only shed readings, village, and the farmer's phone number for alerts. There is no Aadhaar and no bank data.
 - API keys and passwords stay in config files that are never uploaded to GitHub.
 
@@ -202,6 +205,12 @@ Yes. The same kit and software work for anything stored in heaps or sacks that r
 4. Weigh every shed at loading and emptying (80 with the kit, 20 without) to **measure the actual loss reduction**.
 5. Use that data to train the ML model.
 
+### 17. What challenges did you face?
+
+- **The Government price API stalled our server.** data.gov.in answered `curl` in 0.4 seconds but made our Python client wait until it timed out. The server stalls default Python clients. We fixed it by sending **our own User-Agent**. Now the price arrives in under a second.
+- **Market names are not consistent.** The same mandi comes back as "Lasalgaon(Vinchur)", "APMC Lasalgaon" or with extra spaces. We **normalise market names** (trim spaces, ignore the "APMC" prefix) before matching, and still show the original name on screen.
+- **The device must never wait for the price server.** The ESP32 gives up after 5 seconds, so the price is now fetched in the background and every reading is answered from our stored copy.
+
 ---
 
 ## Things you must NOT say
@@ -214,7 +223,7 @@ Yes. The same kit and software work for anything stored in heaps or sacks that r
 ## 30-second live demo order during the pitch
 
 1. Open the **department view**: 8 sheds on the map, colours by risk.
-2. Show **Sinnar (kit OFF) vs Lasalgaon (kit ON)**: same weather; one rots, one stays safe.
+2. Show **Sinnar (kit OFF) vs Lasalgaon (kit ON)**: same weather; one rots, one stays safe **(digital-twin model result, not field data)**. Say this aloud: "This is our simulation model with assumed values, not a field measurement."
 3. Click **"Rot starts"** on a shed. It turns red, and the farmer phone shows the Marathi alert. Press 🔊 Listen.
 4. **Cut network**: the fan keeps running and readings are buffered. Restore it and everything uploads.
 5. Show the **real Telegram message** arriving on your phone.
