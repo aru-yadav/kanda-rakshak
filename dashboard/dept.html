@@ -50,12 +50,15 @@
   <section class="card map"><h2>Sheds on the map (Nashik onion belt)</h2><div id="map"></div>
     <div class="muted">Schematic: positions from shed GPS; colour = rot risk.</div></section>
   <section class="card tbl"><h2>Sheds needing action first</h2>
-    <div class="scroll"><table><thead><tr><th>Shed</th><th>Village</th><th>Stock</th><th>Risk</th><th>Advice sent</th><th>Fan</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+    <div class="scroll"><table><thead><tr><th>Shed</th><th>Village</th><th>Stock</th><th>Risk</th><th>Advice now</th><th>Fan</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
   </section>
 </main>
 <script>
 const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
 const COL = { ROT:'#C0392B', WATCH:'#C77700', SAFE:'#2E7D4F', UNKNOWN:'#6B7280' };
+const LVL = l => Object.hasOwn(COL, l) ? l : 'UNKNOWN';   // whitelist: risk_level goes into class/fill attributes
+const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
 const ACT = { HOLD:'Hold', CONSIDER_SELL:'Consider selling', VENTILATE:'Check / ventilate', SELL_SOON:'Sell this week', SORT_SELL:'Sort today', NO_DATA:'Check device' };
 function drawMap(devs) {
   const pts = devs.filter(d => d.lat != null && d.lon != null);
@@ -67,10 +70,11 @@ function drawMap(devs) {
   for (let la = 19.8; la <= 20.71; la += 0.2) g += `<line x1="${pad}" x2="${W - pad}" y1="${y(la)}" y2="${y(la)}" stroke="#E6E9F0"/><text x="4" y="${y(la) + 4}" font-size="10" fill="#9AA3B5">${la.toFixed(1)}°N</text>`;
   for (let lo = 73.9; lo <= 74.71; lo += 0.2) g += `<line y1="${pad}" y2="${H - pad}" x1="${x(lo)}" x2="${x(lo)}" stroke="#E6E9F0"/><text x="${x(lo) - 14}" y="${H - 10}" font-size="10" fill="#9AA3B5">${lo.toFixed(1)}°E</text>`;
   const dots = pts.map(d => {
-    const r = 7 + Math.min(10, (d.tonnes || 20) / 4);
-    return `<a href="/?device=${d.device_id}"><circle cx="${x(d.lon)}" cy="${y(d.lat)}" r="${r}" fill="${COL[d.risk_level]}" fill-opacity="0.85" stroke="#fff" stroke-width="2">
-      <title>${d.device_id} · ${d.village} · ${d.risk_level} ${Math.round(d.risk_score)}</title></circle>
-      <text x="${x(d.lon) + r + 4}" y="${y(d.lat) + 4}" font-size="11" fill="#1F2937">${d.village}</text></a>`;
+    const lvl = LVL(d.risk_level);
+    const r = 7 + Math.min(10, (num(d.tonnes) || 20) / 4);
+    return `<a href="/?device=${encodeURIComponent(d.device_id)}"><circle cx="${x(num(d.lon))}" cy="${y(num(d.lat))}" r="${r}" fill="${COL[lvl]}" fill-opacity="0.85" stroke="#fff" stroke-width="2">
+      <title>${esc(d.device_id)} · ${esc(d.village)} · ${lvl} ${Math.round(num(d.risk_score))}</title></circle>
+      <text x="${x(num(d.lon)) + r + 4}" y="${y(num(d.lat)) + 4}" font-size="11" fill="#1F2937">${esc(d.village)}</text></a>`;
   }).join('');
   $('map').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Map of monitored sheds"><rect x="${pad}" y="${pad}" width="${W - 2 * pad}" height="${H - 2 * pad}" fill="#FAFBFD" stroke="#D9DEEA" rx="8"/>${g}${dots}</svg>`;
 }
@@ -86,18 +90,18 @@ async function refresh() {
   $('kTonnes').textContent = tonnes.toLocaleString('en-IN') + ' t';
   $('kRisk').textContent = risky.reduce((s, d) => s + (d.tonnes || 0), 0).toLocaleString('en-IN') + ' t';
   $('kRiskN').textContent = `in ${risky.length} shed(s) at WATCH or ROT`;
-  if (f.price) { $('kPrice').textContent = `₹${Math.round(f.price.modal).toLocaleString('en-IN')}/q`; $('kPmeta').textContent = `${f.price.market} · ${f.price.arrival_date || 'n/a'} · ${f.price.source}`; }
+  if (f.price) { $('kPrice').textContent = `₹${Math.round(f.price.modal).toLocaleString('en-IN')}/q`; $('kPmeta').textContent = `${f.price.view.heading_en} · ${f.price.market} · source: ${f.price.source}`; }
   else { $('kPrice').textContent = '—'; $('kPmeta').textContent = 'price not available'; }
   drawMap(devs);
-  $('rows').innerHTML = devs.map(d => `<tr>
-    <td><b>${d.device_id}</b>${d.simulated ? ' <span class="muted">SIM</span>' : ''}${d.control && !d.control.kit_on ? '<br><span class="muted">kit OFF (comparison)</span>' : ''}</td>
-    <td>${d.village || '—'}<br><span class="muted">${d.taluka || ''}</span></td>
-    <td>${d.tonnes ? d.tonnes + ' t' : '—'}</td>
-    <td><span class="pill ${d.risk_level}">${d.risk_level}</span><span class="bar"><i style="width:${Math.round(d.risk_score)}%;background:${COL[d.risk_level]}"></i></span></td>
-    <td>${ACT[d.action] || d.action}</td>
+  $('rows').innerHTML = devs.map(d => { const lvl = LVL(d.risk_level), t = num(d.tonnes); return `<tr>
+    <td><b>${esc(d.device_id)}</b>${d.simulated ? ' <span class="muted">SIM</span>' : ''}${d.control && !d.control.kit_on ? '<br><span class="muted">kit OFF (comparison)</span>' : ''}</td>
+    <td>${esc(d.village || '—')}<br><span class="muted">${esc(d.taluka)}</span></td>
+    <td>${t ? t + ' t' : '—'}</td>
+    <td><span class="pill ${lvl}">${lvl}</span><span class="bar"><i style="width:${Math.round(num(d.risk_score))}%;background:${COL[lvl]}"></i></span></td>
+    <td>${esc(ACT[d.action] || d.action)}</td>
     <td>${d.fan_on ? 'ON' : 'off'}</td>
     <td>${d.online ? 'online' : '<span class="off">offline</span>'}</td>
-    <td><a class="open" href="/?device=${d.device_id}">Open ›</a></td></tr>`).join('');
+    <td><a class="open" href="/?device=${encodeURIComponent(d.device_id)}">Open ›</a></td></tr>`; }).join('');
 }
 refresh(); setInterval(refresh, 5000);
 </script>

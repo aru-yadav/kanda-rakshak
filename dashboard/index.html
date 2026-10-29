@@ -73,7 +73,7 @@
   </section>
   <section class="c7"><div id="advice" class="advice grey"><div class="mr">—</div><div class="en">Waiting for data…</div></div>
     <div class="muted" id="notif" style="margin-top:6px"></div></section>
-  <section class="card c5"><h2>Mandi price (Govt data)</h2>
+  <section class="card c5"><h2 id="phead">Mandi price</h2>
     <div class="big" id="price">—</div>
     <div id="pmeta" class="muted"></div></section>
 
@@ -84,6 +84,8 @@
   <section class="card c3"><h2>Ventilation fan</h2><div class="fan" id="fan">—</div><div class="muted" id="fanmeta"></div>
     <div class="muted" style="margin-top:8px">Fan decision runs on the device itself, so it keeps working without network.</div></section>
 
+  <section class="c12 muted" id="simtime" style="display:none;background:#FFE9C7;color:#8A4B00;border-radius:8px;padding:6px 12px;font-weight:bold">
+    SIMULATED (digital-twin model with assumed coefficients, not field data). Time is compressed: the clock on the x-axis is real time, but one simulated day passes in about 2 minutes.</section>
   <section class="card c6"><h2>Humidity by layer (%)</h2><canvas id="chRh"></canvas></section>
   <section class="card c6"><h2>Rot gas (mV) and risk score</h2><canvas id="chGas"></canvas></section>
   <section class="card c12"><h2>Temperature by layer (°C)</h2><canvas id="chT"></canvas></section>
@@ -113,7 +115,7 @@ const series = (rows, key, label, color, axis='y') => ({ label, borderColor:colo
 async function loadDevices() {
   const list = await (await fetch('/api/v1/devices')).json();
   const sel = $('dev'); const prev = sel.value;
-  sel.innerHTML = list.map(d => `<option value="${d.device_id}">${d.device_id}${d.simulated ? ' (SIMULATED)' : ''}</option>`).join('');
+  sel.innerHTML = list.map(d => `<option value="${esc(d.device_id)}">${esc(d.device_id)}${d.simulated ? ' (SIMULATED)' : ''}</option>`).join('');
   if (prev && list.some(d => d.device_id === prev)) sel.value = prev;
   else { const real = list.find(d => !d.simulated); if (real) sel.value = real.device_id; }
   const want = new URLSearchParams(location.search).get('device');
@@ -144,6 +146,7 @@ async function refresh() {
   const r = await fetch(`/api/v1/devices/${current}/latest`); if (!r.ok) return;
   const d = await r.json();
   $('simflag').style.display = d.simulated ? '' : 'none';
+  $('simtime').style.display = d.simulated ? '' : 'none';
   refreshCtl(d.simulated);
   const ageS = (Date.now() - new Date(d.received_at).getTime()) / 1000;
   $('status').className = 'pill ' + (ageS < 120 ? 'live' : 'off');
@@ -151,19 +154,21 @@ async function refresh() {
   $('updated').textContent = 'Last reading ' + IST(d.measured_at);
 
   $('advice').className = 'advice ' + d.advice.severity;
-  $('advice').innerHTML = `<div class="mr">${d.advice.text_mr}</div><div class="en">${d.advice.text_en}</div>`;
+  $('advice').innerHTML = `<div class="mr">${esc(d.advice.text_mr)}</div><div class="en">${esc(d.advice.text_en)}</div>`;
   $('notif').textContent = d.last_notification ? `Last message sent ${IST(d.last_notification.sent_at)} via ${d.last_notification.channel}` : 'No message sent yet';
 
   if (d.price) {
+    $('phead').textContent = d.price.view.heading_en;
     $('price').textContent = `₹${Math.round(d.price.modal)}/q`;
-    const tr = d.price.trend_pct === null || d.price.trend_pct === undefined ? '' : ` · ${d.price.trend_pct > 0 ? '+' : ''}${d.price.trend_pct}% vs 7-day avg`;
-    $('pmeta').innerHTML = `${d.price.market}${d.price.variety ? ' · ' + d.price.variety : ''} · arrival ${d.price.arrival_date || 'n/a'}${tr}<br>
-      <span class="src ${d.price.source}">source: ${d.price.source}</span>`;
-  } else { $('price').textContent = '—'; $('pmeta').textContent = 'No price available'; }
+    const tp = d.price.trend_pct == null ? NaN : Number(d.price.trend_pct);   // number only: goes into innerHTML
+    const tr = Number.isFinite(tp) ? ` · ${tp > 0 ? '+' : ''}${tp}% vs 7-day avg` : '';
+    $('pmeta').innerHTML = `${esc(d.price.market)}${d.price.variety ? ' · ' + esc(d.price.variety) : ''} · arrival ${esc(d.price.arrival_date || 'n/a')}${tr}<br>
+      <span class="src ${esc(d.price.source)}">source: ${esc(d.price.source)}</span>`;
+  } else { $('phead').textContent = 'Mandi price'; $('price').textContent = '—'; $('pmeta').textContent = 'No price available'; }
 
   $('score').textContent = fmt(d.risk.score, 0);
   $('level').textContent = `${d.risk.level}${d.risk.worst_layer ? ' · worst: ' + d.risk.worst_layer + ' layer' : ''}`;
-  $('reasons').innerHTML = d.risk.reasons.map(x => `<li>${x}</li>`).join('');
+  $('reasons').innerHTML = d.risk.reasons.map(x => `<li>${esc(x)}</li>`).join('');
 
   const names = {top:'TOP', mid:'MIDDLE', bot:'BOTTOM', amb:'OUTSIDE'};
   $('layers').innerHTML = Object.entries(names).map(([k, n]) =>
@@ -228,7 +233,7 @@ async function refreshWhy() {
                 'cache': 'Government data (data.gov.in / Agmarknet), CACHED from an earlier fetch',
                 'fallback': 'NOT live: manual fallback value from config, not shown to the farmer'};
   const price = (P.source ? `<div><b>₹${Math.round(P.modal)}/quintal</b> · ${esc(P.market)} · arrival ${esc(P.arrival_date || 'n/a')}
-      · trend ${P.trend_pct === null || P.trend_pct === undefined ? 'unknown' : (P.trend_pct > 0 ? '+' : '') + P.trend_pct + '%'}
+      · trend ${P.trend_pct == null || !Number.isFinite(Number(P.trend_pct)) ? 'unknown' : (Number(P.trend_pct) > 0 ? '+' : '') + Number(P.trend_pct) + '%'}
       <span class="src ${esc(P.source)}">source: ${esc(P.source)}</span></div>
       <div class="muted">fetched at ${P.fetched_at ? IST(P.fetched_at) : 'n/a (not from the API)'}</div>`
       : '<div><b>No price available</b> — advice made without price</div>') +

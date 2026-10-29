@@ -60,7 +60,7 @@
           <button class="listen" id="listen">🔊 ऐका (Listen)</button>
         </div>
         <div class="card">
-          <h2>आजचा कांदा भाव · Today's mandi price</h2>
+          <h2 id="phead">कांदा भाव · Mandi price</h2>
           <div class="price" id="price">—</div>
           <div class="muted" id="pmeta"></div>
         </div>
@@ -78,11 +78,11 @@
   </div>
   <div class="side">
     <h2>Farmer's view</h2>
-    <p>This is what a farmer with a smartphone sees. Farmers with a basic keypad phone get the same instruction as a Marathi voice call and SMS. No app, reading or internet needed.</p>
+    <p>This is what a farmer with a smartphone sees. <i>Planned:</i> farmers with a basic keypad phone get the same instruction as a Marathi SMS / voice call (not built yet; the demo channel is Telegram).</p>
     <ul>
       <li><b>One status word:</b> सुरक्षित (safe) / लक्ष ठेवा (watch) / धोका (danger)</li>
       <li><b>One instruction:</b> hold, check, sort or sell</li>
-      <li><b>Today's mandi price</b> from Govt Agmarknet data, with date and source</li>
+      <li><b>Mandi price</b> from Govt Agmarknet data (data.gov.in), with its date. Shown only when it is a real Agmarknet price</li>
       <li><b>Listen button:</b> the same message as Marathi voice</li>
     </ul>
     <p class="muted">Demo: data comes from the Kanda Rakshak digital twin (simulated sheds) until the hardware is installed.</p>
@@ -90,6 +90,7 @@
 </div>
 <script>
 const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
 const WORD = { green:'सुरक्षित', amber:'लक्ष ठेवा', red:'धोका', grey:'माहिती नाही' };
 const LMR = { top:'वरचा', mid:'मधला', bot:'खालचा' };
 const fmtIST = s => s ? new Date(s).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
@@ -99,7 +100,7 @@ async function loadDevices() {
   const list = await (await fetch('/api/v1/devices')).json();
   const want = new URLSearchParams(location.search).get('device');
   const sel = $('dev'); const prev = sel.value || want;
-  sel.innerHTML = list.map(d => `<option value="${d.device_id}">${d.device_id}${d.simulated ? ' (SIM)' : ''}</option>`).join('');
+  sel.innerHTML = list.map(d => `<option value="${esc(d.device_id)}">${esc(d.device_id)}${d.simulated ? ' (SIM)' : ''}</option>`).join('');
   if (prev && list.some(d => d.device_id === prev)) sel.value = prev;
   else if (list.some(d => d.device_id === 'SIM-NSK-01')) sel.value = 'SIM-NSK-01';
   current = sel.value;
@@ -119,15 +120,20 @@ async function refresh() {
   $('mr').textContent = d.advice.text_mr;
   $('en').textContent = d.advice.text_en;
   lastText = d.advice.text_mr;
-  if (d.price) {
+  const pv = d.price && d.price.view;   // labelling decided by the backend (advisory.price_view), never here
+  if (pv && pv.farmer_visible) {
+    $('phead').textContent = `${pv.heading_mr} · ${pv.heading_en}`;
     $('price').textContent = `₹${Math.round(d.price.modal).toLocaleString('en-IN')} / क्विंटल`;
-    const tr = d.price.trend_pct == null ? '' : ` · ${d.price.trend_pct > 0 ? '+' : ''}${d.price.trend_pct}% (7 दिवस)`;
-    $('pmeta').textContent = `${d.price.market} · ${d.price.arrival_date || 'date n/a'} · source: ${d.price.source}${tr}`;
-  } else { $('price').textContent = '—'; $('pmeta').textContent = 'भाव उपलब्ध नाही (price not available)'; }
+    const tr = d.price.trend_pct == null ? '' : ` · ${d.price.trend_pct > 0 ? '+' : ''}${d.price.trend_pct}% vs earlier days`;
+    $('pmeta').textContent = `${d.price.market} · ${pv.date} · source: ${d.price.source}${tr}`;
+  } else {   // fallback / no price: the farmer is never shown a typed-in number as a mandi rate
+    $('phead').textContent = 'कांदा भाव · Mandi price';
+    $('price').textContent = '—'; $('pmeta').textContent = 'आजचा भाव उपलब्ध नाही (live Agmarknet price not available)';
+  }
   $('layers').innerHTML = ['top','mid','bot'].map(k => `<div class="lay" style="border-top-color:${layerColor(d.layers[k].rh)}"><b>${LMR[k]} थर</b>${d.layers[k].t != null ? d.layers[k].t.toFixed(1) : '—'}°C<br>${d.layers[k].rh != null ? Math.round(d.layers[k].rh) : '—'}% ओलावा</div>`).join('');
-  $('fan').textContent = d.fan_on ? 'चालू (आपोआप)' : 'बंद';
+  $('fan').textContent = d.fan_on ? (d.fan_mode === 'A' ? 'चालू (आपोआप)' : 'चालू') : 'बंद';
   const msgs = await (await fetch(`/api/v1/devices/${current}/messages?limit=5`)).json();
-  $('msgs').innerHTML = msgs.length ? msgs.map(m => `<div class="msg"><div class="t">${fmtIST(m.sent_at)} · ${m.channel}</div>${m.text_mr}</div>`).join('') : 'अजून संदेश नाही.';
+  $('msgs').innerHTML = msgs.length ? msgs.map(m => `<div class="msg"><div class="t">${fmtIST(m.sent_at)} · ${esc(m.channel)}</div>${esc(m.text_mr)}</div>`).join('') : 'अजून संदेश नाही.';
 }
 
 $('listen').addEventListener('click', async () => {
