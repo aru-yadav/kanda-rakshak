@@ -96,7 +96,7 @@ button:focus-visible { outline: 2px solid var(--onion); outline-offset: 2px; }
 <div class="wrap">
   <header>
     <h1>कांदा रक्षक <small>Kanda Rakshak 3D simulator</small></h1>
-    <span class="tag">How the kit protects stored onion inside a kanda chawl: watch → act → tell. Illustrative physics, not field data.</span>
+    <span class="tag">How the kit protects stored onion inside a kanda chawl: watch → act → tell. SIMULATED · illustrative model with assumed numbers, not field data.</span>
   </header>
 
   <div class="controls" role="group" aria-label="Simulation controls">
@@ -123,7 +123,7 @@ button:focus-visible { outline: 2px solid var(--onion); outline-offset: 2px; }
     <div class="stage" id="stage">
       <canvas id="cv" aria-label="3D model of a kanda chawl fitted with the Kanda Rakshak kit"></canvas>
       <div class="labels" id="labels"></div>
-      <div class="hud"><span id="clock">Day 1 · 06:00</span><span id="amb">Outside —</span><span id="loss">Onion affected 0%</span></div>
+      <div class="hud"><span id="clock">Day 1 · 06:00</span><span id="amb">Outside —</span><span id="loss">Onion affected (model) 0%</span></div>
       <div class="hint">Drag to rotate · scroll or pinch to zoom</div>
     </div>
 
@@ -143,11 +143,11 @@ button:focus-visible { outline: 2px solid var(--onion); outline-offset: 2px; }
       <div class="card">
         <h2>What the farmer's phone gets</h2>
         <div class="phone" aria-live="polite">
-          <div class="top"><span>कांदा रक्षक · KR-01</span><span id="sig">4G ▂▄▆</span></div>
+          <div class="top"><span>कांदा रक्षक · SIM-3D · SIMULATED</span><span id="sig">4G ▂▄▆</span></div>
           <div class="bubble"><div class="mr" id="msgmr">—</div><div class="en" id="msgen"></div><div class="meta" id="msgmeta"></div></div>
           <div class="queue" id="queue" hidden></div>
         </div>
-        <p class="note" style="margin:8px 0 0">Price shown is an example (₹2,400/q, Lasalgaon). The real kit pulls the daily modal price from Govt Agmarknet data on data.gov.in.</p>
+        <p class="note" style="margin:8px 0 0">SIMULATED message, no price: the real system adds the dated mandi price only when it comes live from Govt Agmarknet (data.gov.in).</p>
       </div>
     </div>
   </div>
@@ -178,7 +178,6 @@ const SC = {
 };
 const LAYERS = ["top", "mid", "bot"];
 const LAYER_W = { top: 0.45, mid: 0.75, bot: 1.0 };
-const PRICE = { market: "Lasalgaon", modal: 2400 };
 
 const S = {};
 function resetSim() {
@@ -251,13 +250,13 @@ function risk(layers, amb, gas) {
 const NAME = { top: "top", mid: "middle", bot: "bottom" };
 const LMR = { top: "वरच्या", mid: "मधल्या", bot: "खालच्या" };
 function advice(level, worst) {
-  const pmr = ` आजचा लासलगाव भाव ₹${PRICE.modal}/क्विंटल.`, pen = ` Today's Lasalgaon rate ₹${PRICE.modal}/quintal.`;
+  const pmr = "", pen = "";   // no price in a simulated message: never show an example as "today's rate"
   if (level === "ROT") return { action: "SORT_SELL", sev: "rot",
     mr: `धोका: ${LMR[worst]} थरात कांदा सडायला सुरुवात झाली आहे. आज निवडणी करा आणि खराब कांदा वेगळा करा.${pmr}`,
     en: `Alert: rot has started in the ${NAME[worst]} layer. Sort today and separate the damaged onions.${pen}` };
   if (level === "WATCH") return { action: "VENTILATE", sev: "watch",
-    mr: `कांद्यात ओलावा/उष्णता वाढत आहे. ${kitOn ? "पंखे चालू आहेत." : ""} आज एकदा कांदा तपासा.${pmr}`.replace("  ", " "),
-    en: `Moisture/heat is rising in the heap.${kitOn ? " Fans are running." : ""} Check the onions once today.${pen}` };
+    mr: `कांद्यात ओलावा/उष्णता वाढत आहे. बाहेरची हवा कोरडी असताना पंखा आपोआप चालेल. आज एकदा कांदा तपासा.${pmr}`,
+    en: `Moisture/heat is rising in the heap. The fan runs automatically when outside air is drier. Check the onions once today.${pen}` };
   return { action: "HOLD", sev: "safe", mr: `तुमचा कांदा सुरक्षित आहे. आत्ता विकू नका, थांबा.${pmr}`, en: `Your onions are safe. Don't sell yet, hold.${pen}` };
 }
 
@@ -425,7 +424,7 @@ function updateUI(force) {
   $("clock").textContent = fmtClock(S.t);
   $("amb").textContent = `Outside ${amb.t.toFixed(1)}°C · ${Math.round(amb.rh)}% RH`;
   const affected = onionInfo.reduce((s, o) => s + (S.rot * 1.25 > o.thr ? 1 : 0), 0) / ON;
-  $("loss").textContent = `Onion affected ${Math.round(affected * 100)}%`;
+  $("loss").textContent = `Onion affected (model, illustrative) ${Math.round(affected * 100)}%`;
 
   const names = { top: "TOP", mid: "MIDDLE", bot: "BOTTOM" };
   $("layers").innerHTML = LAYERS.map(L => {
@@ -441,7 +440,7 @@ function updateUI(force) {
   const mtr = $("meter"); mtr.style.width = `${Math.round(r.score)}%`; mtr.style.background = `var(${sevColor[r.level.toLowerCase()]})`;
 
   if (!kitOn) { $("msgmr").textContent = "कोणताही संदेश नाही."; $("msgen").textContent = "Traditional chawl: no sensors, no alert. The farmer finds rot only when it smells."; $("msgmeta").textContent = ""; }
-  else if (S.msg) { $("msgmr").textContent = S.msg.mr; $("msgen").textContent = S.msg.en; $("msgmeta").textContent = `${S.msg.stamp} · voice call + SMS`; }
+  else if (S.msg) { $("msgmr").textContent = S.msg.mr; $("msgen").textContent = S.msg.en; $("msgmeta").textContent = `${S.msg.stamp} · SIMULATED`; }
   $("sig").textContent = netOn ? "4G ▂▄▆" : "No signal ✕";
   const q = $("queue"); q.hidden = !(kitOn && !netOn);
   q.textContent = `Offline: fan still runs on the device. ${S.queue.length} message(s) waiting, sent when signal returns.`;

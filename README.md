@@ -2,11 +2,11 @@
 
 **Seva First Innovation Challenge 2026 (Maharashtra)** · Sector 1 Agriculture · Sub-theme 5: Post-Harvest Loss, Storage and Price Protection
 
-A low-cost (≈₹7,600) retrofit kit that turns a farmer's existing onion shed (kanda chawl) into a smart store:
+A low-cost (≈₹7,900, BOM in progress) retrofit kit that turns a farmer's existing onion shed (kanda chawl) into a smart store:
 
 - **Watches** heat, humidity and rot gas at the top, middle and bottom of the onion heap
 - **Acts** on its own: switches ventilation fans on when outside air is drier, even with no network
-- **Tells** the farmer one instruction a day in Marathi, by voice or SMS on any phone: **Hold, Sort or Sell**. The instruction combines the heap's rot risk with the live mandi price from Government Agmarknet data (data.gov.in).
+- **Tells** the farmer one instruction a day in Marathi: **Hold, Sort or Sell**. Demo channel: Telegram text + voice note. Planned: SMS / voice call for keypad phones. The instruction combines the heap's rot risk with the live mandi price from Government Agmarknet data (data.gov.in).
 
 > Demo video: `<paste YouTube link>`
 
@@ -14,20 +14,17 @@ A low-cost (≈₹7,600) retrofit kit that turns a farmer's existing onion shed 
 
 | Part | Status |
 |---|---|
-| Backend (FastAPI), rot-risk engine, Marathi advisory | ✅ Built, 30 automated tests passing |
+| Backend (FastAPI), rule-based rot-risk score, Marathi advisory, `/explain` decision trace | ✅ Built, 67 automated tests passing |
 | Live mandi price (data.gov.in Agmarknet) | ✅ Integrated, with cache and fallback labels |
 | Farmer app, shed dashboard, department/FPO dashboard | ✅ Built |
-| Digital twin: 8 simulated sheds around Nashik | ✅ Running, uses the same fan logic as the firmware |
-| ESP32 firmware + hardware (DHT22 ×4, MQ-135/136, solar fan) | 🔧 Designed, being assembled |
+| Digital twin: 8 simulated sheds around Nashik | ✅ Running. Heap model with assumed coefficients; fan rule modelled on the firmware (not yet verified against it) |
+| SMS / voice call for keypad phones | 📅 Planned (demo uses Telegram) |
+| ESP32 firmware + hardware (DHT22 ×4, MQ-135/136, solar fan) | 🔧 Firmware written (compile pending), hardware being assembled |
 | Field pilot (80 sheds, Niphad–Lasalgaon) | 📅 Proposed |
 
-All demo data comes from the digital twin and is labelled **SIMULATED** in the UI.
+All demo data comes from the digital twin and is labelled **SIMULATED** in the UI. Twin results (e.g. kit ON vs OFF) come from a model with assumed numbers, not from measurements.
 
-## Screenshots (simulated data)
-
-| Farmer app (Marathi) | Shed dashboard | Department / FPO view |
-|---|---|---|
-| ![Farmer](docs/demo-farmer-simulated.png) | ![Shed](docs/demo-shed-simulated.png) | ![Department](docs/demo-dept-simulated.png) |
+Screenshots are being retaken after the price-labelling fix (the earlier ones showed a fallback price as "today's rate").
 
 ## Run the demo (no hardware needed)
 
