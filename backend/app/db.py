@@ -24,12 +24,23 @@ CREATE TABLE IF NOT EXISTS prices (
 CREATE TABLE IF NOT EXISTS overrides (
   device_id TEXT PRIMARY KEY, mode TEXT NOT NULL, until_utc TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS device_meta (
+  device_id TEXT PRIMARY KEY, farmer TEXT, village TEXT, taluka TEXT,
+  lat REAL, lon REAL, tonnes REAL, crop TEXT
+);
+CREATE TABLE IF NOT EXISTS sim_control (
+  device_id TEXT PRIMARY KEY, scenario TEXT NOT NULL DEFAULT 'humid',
+  offline INTEGER NOT NULL DEFAULT 0, kit_on INTEGER NOT NULL DEFAULT 1, reset INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS notifications (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   device_id TEXT NOT NULL, sent_at TEXT NOT NULL, action TEXT NOT NULL,
-  text_mr TEXT, text_en TEXT, channel TEXT
+  text_mr TEXT, text_en TEXT, channel TEXT,
+  reading_id INTEGER, price TEXT
 );
 """
+# additive columns for databases created before they existed (CREATE TABLE IF NOT EXISTS won't add them)
+MIGRATIONS = {"notifications": {"reading_id": "INTEGER", "price": "TEXT"}}
 
 
 class DB:
@@ -40,6 +51,11 @@ class DB:
         self.lock = threading.Lock()
         with self.lock:
             self.conn.executescript(SCHEMA)
+            for table, cols in MIGRATIONS.items():
+                have = {r["name"] for r in self.conn.execute(f"PRAGMA table_info({table})")}  # fixed names only
+                for col, typ in cols.items():
+                    if col not in have:
+                        self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {col} {typ}")
             self.conn.commit()
 
     def execute(self, sql: str, params: tuple = ()) -> sqlite3.Cursor:

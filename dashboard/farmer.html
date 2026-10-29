@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="mr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanda Rakshak Farmer App</title>
+<style>
+  :root { --navy:#1B2A5C; --orange:#F28C28; --bg:#EEF1F6; --card:#fff; --border:#D9DEEA; --ink:#1F2937; --muted:#6B7280;
+          --green:#2E7D4F; --amber:#C77700; --red:#C0392B; --grey:#6B7280; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: "Noto Sans Devanagari", Arial, sans-serif; background:var(--bg); color:var(--ink); }
+  .top { background:var(--navy); color:#fff; padding:10px 16px; display:flex; gap:14px; align-items:center; flex-wrap:wrap; }
+  .top a { color:#C9D2EC; text-decoration:none; font-size:14px; } .top a.on { color:#fff; font-weight:bold; border-bottom:2px solid var(--orange); }
+  .wrap { display:flex; gap:28px; justify-content:center; align-items:flex-start; padding:20px 16px; flex-wrap:wrap; }
+  .phone { width:380px; max-width:100%; background:#10141C; border-radius:36px; padding:14px; box-shadow:0 10px 30px rgba(0,0,0,.25); }
+  .screen { background:var(--bg); border-radius:26px; overflow:hidden; min-height:720px; }
+  .appbar { background:var(--navy); color:#fff; padding:14px 16px 12px; }
+  .appbar h1 { margin:0; font-size:20px; } .appbar small { color:#C9D2EC; }
+  .sim { display:inline-block; background:#FFE9C7; color:#8A4B00; font-size:11px; font-weight:bold; padding:2px 8px; border-radius:999px; margin-top:6px; }
+  .body { padding:12px; display:grid; gap:10px; }
+  .status { border-radius:18px; padding:16px; color:#fff; }
+  .status .word { font-size:30px; font-weight:bold; }
+  .status .mr { font-size:18px; line-height:1.5; margin-top:6px; font-weight:600; }
+  .status .en { font-size:13px; opacity:.9; margin-top:6px; }
+  .green { background:var(--green); } .amber { background:var(--amber); } .red { background:var(--red); } .grey { background:var(--grey); }
+  .listen { margin-top:12px; width:100%; font:inherit; font-size:17px; font-weight:bold; border:0; border-radius:14px; padding:12px; background:#fff; color:var(--navy); cursor:pointer; }
+  .card { background:var(--card); border-radius:16px; padding:12px 14px; border:1px solid var(--border); }
+  .card h2 { font-size:13px; color:var(--muted); margin:0 0 6px; font-weight:600; }
+  .price { font-size:30px; font-weight:bold; color:var(--navy); }
+  .muted { color:var(--muted); font-size:12px; }
+  .layers { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+  .lay { background:var(--bg); border-radius:10px; padding:8px 4px; text-align:center; border-top:4px solid var(--grey); font-size:13px; }
+  .lay b { display:block; font-size:12px; color:var(--muted); }
+  .fan { display:flex; justify-content:space-between; align-items:center; font-size:16px; }
+  .msg { border-bottom:1px solid var(--border); padding:8px 0; font-size:14px; } .msg:last-child { border:0; }
+  .msg .t { font-size:11px; color:var(--muted); }
+  .side { max-width:340px; font-family: Arial, sans-serif; color:var(--ink); }
+  .side h2 { color:var(--navy); margin-top:0; } .side li { margin:6px 0; }
+  select { font:inherit; padding:4px 8px; border-radius:8px; border:0; }
+</style>
+</head>
+<body>
+<div class="top">
+  <a href="/">Shed</a><a class="on" href="/farmer">Farmer app</a><a href="/dept">Department</a>
+  <select id="dev" aria-label="Shed"></select>
+</div>
+<div class="wrap">
+  <div class="phone" aria-label="Farmer phone preview">
+    <div class="screen">
+      <div class="appbar">
+        <h1>कांदा रक्षक</h1>
+        <small id="where">—</small><br>
+        <span class="sim" id="simflag" hidden>SIMULATED · डेमो डेटा</span>
+      </div>
+      <div class="body">
+        <div class="status grey" id="status">
+          <div class="word" id="word">—</div>
+          <div class="mr" id="mr">माहिती येत आहे…</div>
+          <div class="en" id="en"></div>
+          <button class="listen" id="listen">🔊 ऐका (Listen)</button>
+        </div>
+        <div class="card">
+          <h2 id="phead">कांदा भाव · Mandi price</h2>
+          <div class="price" id="price">—</div>
+          <div class="muted" id="pmeta"></div>
+        </div>
+        <div class="card">
+          <h2>चाळीतील कांदा · Inside your shed</h2>
+          <div class="layers" id="layers"></div>
+          <div class="fan" style="margin-top:10px"><span>पंखा (Fan)</span><b id="fan">—</b></div>
+        </div>
+        <div class="card">
+          <h2>आलेले संदेश · Messages received</h2>
+          <div id="msgs" class="muted">अजून संदेश नाही.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="side">
+    <h2>Farmer's view</h2>
+    <p>This is what a farmer with a smartphone sees. <i>Planned:</i> farmers with a basic keypad phone get the same instruction as a Marathi SMS / voice call (not built yet; the demo channel is Telegram).</p>
+    <ul>
+      <li><b>One status word:</b> सुरक्षित (safe) / लक्ष ठेवा (watch) / धोका (danger)</li>
+      <li><b>One instruction:</b> hold, check, sort or sell</li>
+      <li><b>Mandi price</b> from Govt Agmarknet data (data.gov.in), with its date. Shown only when it is a real Agmarknet price</li>
+      <li><b>Listen button:</b> the same message as Marathi voice</li>
+    </ul>
+    <p class="muted">Demo: data comes from the Kanda Rakshak digital twin (simulated sheds) until the hardware is installed.</p>
+  </div>
+</div>
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
+const WORD = { green:'सुरक्षित', amber:'लक्ष ठेवा', red:'धोका', grey:'माहिती नाही' };
+const LMR = { top:'वरचा', mid:'मधला', bot:'खालचा' };
+const fmtIST = s => s ? new Date(s).toLocaleString('en-IN', {timeZone:'Asia/Kolkata', day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit'}) : '';
+let current = null, lastText = '';
+
+async function loadDevices() {
+  const list = await (await fetch('/api/v1/devices')).json();
+  const want = new URLSearchParams(location.search).get('device');
+  const sel = $('dev'); const prev = sel.value || want;
+  sel.innerHTML = list.map(d => `<option value="${esc(d.device_id)}">${esc(d.device_id)}${d.simulated ? ' (SIM)' : ''}</option>`).join('');
+  if (prev && list.some(d => d.device_id === prev)) sel.value = prev;
+  else if (list.some(d => d.device_id === 'SIM-NSK-01')) sel.value = 'SIM-NSK-01';
+  current = sel.value;
+}
+function layerColor(rh) { return rh > 85 ? 'var(--red)' : rh > 78 ? 'var(--amber)' : 'var(--green)'; }
+
+async function refresh() {
+  if (!current) { await loadDevices(); if (!current) return; }
+  const r = await fetch(`/api/v1/devices/${current}/latest`); if (!r.ok) return;
+  const d = await r.json();
+  $('simflag').hidden = !d.simulated;
+  const fl = await (await fetch('/api/v1/fleet')).json();
+  const meta = fl.devices.find(x => x.device_id === current) || {};
+  $('where').textContent = `${meta.village || current}${meta.tonnes ? ' · ' + meta.tonnes + ' टन कांदा' : ''}`;
+  $('status').className = 'status ' + d.advice.severity;
+  $('word').textContent = WORD[d.advice.severity] || '—';
+  $('mr').textContent = d.advice.text_mr;
+  $('en').textContent = d.advice.text_en;
+  lastText = d.advice.text_mr;
+  const pv = d.price && d.price.view;   // labelling decided by the backend (advisory.price_view), never here
+  if (pv && pv.farmer_visible) {
+    $('phead').textContent = `${pv.heading_mr} · ${pv.heading_en}`;
+    $('price').textContent = `₹${Math.round(d.price.modal).toLocaleString('en-IN')} / क्विंटल`;
+    const tr = d.price.trend_pct == null ? '' : ` · ${d.price.trend_pct > 0 ? '+' : ''}${d.price.trend_pct}% vs earlier days`;
+    $('pmeta').textContent = `${d.price.market} · ${pv.date} · source: ${d.price.source}${tr}`;
+  } else {   // fallback / no price: the farmer is never shown a typed-in number as a mandi rate
+    $('phead').textContent = 'कांदा भाव · Mandi price';
+    $('price').textContent = '—'; $('pmeta').textContent = 'आजचा भाव उपलब्ध नाही (live Agmarknet price not available)';
+  }
+  $('layers').innerHTML = ['top','mid','bot'].map(k => `<div class="lay" style="border-top-color:${layerColor(d.layers[k].rh)}"><b>${LMR[k]} थर</b>${d.layers[k].t != null ? d.layers[k].t.toFixed(1) : '—'}°C<br>${d.layers[k].rh != null ? Math.round(d.layers[k].rh) : '—'}% ओलावा</div>`).join('');
+  $('fan').textContent = d.fan_on ? (d.fan_mode === 'A' ? 'चालू (आपोआप)' : 'चालू') : 'बंद';
+  const msgs = await (await fetch(`/api/v1/devices/${current}/messages?limit=5`)).json();
+  $('msgs').innerHTML = msgs.length ? msgs.map(m => `<div class="msg"><div class="t">${fmtIST(m.sent_at)} · ${esc(m.channel)}</div>${esc(m.text_mr)}</div>`).join('') : 'अजून संदेश नाही.';
+}
+
+$('listen').addEventListener('click', async () => {
+  const a = new Audio(`/api/v1/devices/${current}/voice.mp3?t=${Date.now()}`);
+  try { await a.play(); }
+  catch (e) {  // offline / gTTS unavailable: fall back to the browser's own Marathi voice if it has one
+    if ('speechSynthesis' in window) { const u = new SpeechSynthesisUtterance(lastText); u.lang = 'mr-IN'; speechSynthesis.speak(u); }
+  }
+});
+$('dev').addEventListener('change', e => { current = e.target.value; history.replaceState(null, '', `?device=${current}`); refresh(); });
+(async () => { await loadDevices(); await refresh(); setInterval(refresh, 4000); })();
+</script>
+</body>
+</html>

@@ -1,10 +1,14 @@
 """Notifications. Demo channel: Telegram (Marathi text + Marathi voice note).
 Production: DLT-registered SMS + IVR (see docs/TECH_STACK.md)."""
+import json
 import logging
+import os
 import tempfile
+import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
+from urllib.parse import quote
 
 import httpx
 
@@ -15,34 +19,78 @@ from .db import DB
 log = logging.getLogger("notify")
 
 
-def make_voice(text_mr: str) -> Optional[Path]:
+MIN_MP3_BYTES = 1024   # anything smaller is a truncated / failed TTS download
+
+
+def tts_to_file(text_mr: str, target: Path) -> bool:
+    """Marathi TTS into `target`, atomically: render to a private temp file, check it, then rename.
+    A failed or partial download never lands at `target` (gTTS opens its output file before streaming)."""
+    if target.exists() and target.stat().st_size >= MIN_MP3_BYTES:
+        return True
+    part = target.with_name(f".{target.name}.{uuid.uuid4().hex}.part")
     try:
         from gtts import gTTS
-        f = Path(tempfile.gettempdir()) / f"kr_voice_{abs(hash(text_mr))}.mp3"
-        if not f.exists():
-            gTTS(text=text_mr, lang="mr").save(str(f))
-        return f
+        gTTS(text=text_mr, lang="mr").save(str(part))
+        if part.stat().st_size < MIN_MP3_BYTES:
+            raise IOError(f"TTS output only {part.stat().st_size} bytes")
+        os.replace(part, target)
+        return True
     except Exception as e:
-        log.warning("voice generation failed: %s", e)
-        return None
+        log.warning("voice generation failed: %s", type(e).__name__)
+        return False
+    finally:
+        part.unlink(missing_ok=True)
+
+
+def make_voice(text_mr: str) -> Optional[Path]:
+    f = Path(tempfile.gettempdir()) / f"kr_voice_{abs(hash(text_mr))}.mp3"
+    return f if tts_to_file(text_mr, f) else None
+
+
+def describe_telegram_error(e: Exception) -> str:
+    """Safe one-line error: Telegram URLs carry the bot token (api.telegram.org/bot<TOKEN>/...)."""
+    if isinstance(e, httpx.HTTPStatusError):
+        return f"HTTP {e.response.status_code} from Telegram"
+    text = f"{type(e).__name__}: {e}"
+    tok = settings.telegram_token
+    for form in ({tok, quote(tok, safe="")} if tok else set()):
+        text = text.replace(form, "REDACTED")
+    return text
 
 
 class Notifier:
     def __init__(self, db: DB) -> None:
         self.db = db
 
-    def _last(self, device_id: str):
-        rows = self.db.query("SELECT * FROM notifications WHERE device_id=? ORDER BY id DESC LIMIT 1", (device_id,))
+    def _last(self, device_id: str, before: Optional[datetime] = None):
+        if before is None:
+            rows = self.db.query("SELECT * FROM notifications WHERE device_id=? ORDER BY id DESC LIMIT 1", (device_id,))
+        else:
+            rows = self.db.query("SELECT * FROM notifications WHERE device_id=? AND sent_at<? ORDER BY id DESC LIMIT 1",
+                                 (device_id, before.isoformat()))
         return rows[0] if rows else None
 
-    def should_send(self, device_id: str, advice: Advice) -> bool:
-        last = self._last(device_id)
-        if last is None or last["action"] != advice.action:
-            return advice.action != "NO_DATA"
-        age = (datetime.now(timezone.utc) - datetime.fromisoformat(last["sent_at"])).total_seconds()
-        return age >= settings.notify_min_interval_s
+    def check(self, device_id: str, advice: Advice, as_of: Optional[datetime] = None) -> tuple[bool, str]:
+        """(send?, why) — the farmer gets a message only when the advice changes, or the same advice after the min interval.
+        as_of: judge against message history as it was at that moment (default: now)."""
+        if advice.action == "NO_DATA":
+            return False, "NO_DATA advice is never messaged to the farmer"
+        last = self._last(device_id, as_of)
+        if last is None:
+            return True, "first message for this device"
+        if last["action"] != advice.action:
+            return True, f"advice changed from {last['action']} to {advice.action}"
+        age = ((as_of or datetime.now(timezone.utc)) - datetime.fromisoformat(last["sent_at"])).total_seconds()
+        if age >= settings.notify_min_interval_s:
+            return True, f"same advice, last sent {age / 60:.0f} min ago (>= {settings.notify_min_interval_s // 60} min)"
+        return False, f"same advice already sent {age / 60:.0f} min ago (repeat after {settings.notify_min_interval_s // 60} min)"
 
-    def send(self, device_id: str, advice: Advice, simulated: bool = False) -> str:
+    def should_send(self, device_id: str, advice: Advice) -> bool:
+        return self.check(device_id, advice)[0]
+
+    def send(self, device_id: str, advice: Advice, simulated: bool = False,
+             reading_id: Optional[int] = None, price: Optional[dict] = None) -> str:
+        """reading_id/price: which reading triggered this and the price snapshot used, so /explain shows what was sent."""
         tag = "[SIMULATED] " if simulated else ""
         text = f"{tag}कांदा रक्षक · {device_id}\n\n{advice.text_mr}\n\n— {advice.text_en}"
         channel = "console"
@@ -60,10 +108,12 @@ class Notifier:
                                        "title": "कांदा रक्षक सल्ला"}, files={"audio": fh}).raise_for_status()
                 channel = "telegram"
             except Exception as e:
-                log.warning("telegram failed: %s", e)
+                log.warning("telegram failed: %s", describe_telegram_error(e))
                 channel = "console(telegram-failed)"
         self.db.execute(
-            "INSERT INTO notifications(device_id, sent_at, action, text_mr, text_en, channel) VALUES (?,?,?,?,?,?)",
-            (device_id, datetime.now(timezone.utc).isoformat(), advice.action, advice.text_mr, advice.text_en, channel),
+            "INSERT INTO notifications(device_id, sent_at, action, text_mr, text_en, channel, reading_id, price) "
+            "VALUES (?,?,?,?,?,?,?,?)",
+            (device_id, datetime.now(timezone.utc).isoformat(), advice.action, advice.text_mr, advice.text_en, channel,
+             reading_id, json.dumps(price) if price else None),
         )
         return channel

@@ -1,6 +1,9 @@
-from app.advisory import decide
+from datetime import datetime
 
-P = {"market": "Lasalgaon", "modal": 2400, "trend_pct": 0}
+from app.advisory import IST, decide
+
+TODAY = datetime.now(IST).date().isoformat()
+P = {"market": "Lasalgaon", "modal": 2400, "trend_pct": 0, "source": "data.gov.in", "arrival_date": TODAY}
 
 
 def test_hold_when_safe():
@@ -36,3 +39,40 @@ def test_unknown():
 
 def test_market_name_in_marathi():
     assert "लासलगाव" in decide("SAFE", P).text_mr
+
+
+def test_every_branch_reports_rule_and_why():
+    cases = [("UNKNOWN", P, "UNKNOWN"), ("ROT", P, "ROT"), ("WATCH", {**P, "trend_pct": 6}, "WATCH & trend >= +5%"),
+             ("WATCH", P, "WATCH & trend < +5%"), ("SAFE", {**P, "trend_pct": 12}, "SAFE & trend >= +10%"),
+             ("SAFE", None, "SAFE & trend < +10%")]
+    for level, price, rule in cases:
+        a = decide(level, price)
+        assert a.rule == rule and a.why
+    assert "+6.0%" in decide("WATCH", {**P, "trend_pct": 6}).why
+    assert "unknown" in decide("SAFE", None).why
+
+
+def test_live_price_today_is_todays_rate():
+    a = decide("SAFE", P)
+    assert "Today's Lasalgaon rate ₹2400" in a.text_en and "आजचा लासलगाव भाव ₹2400" in a.text_mr
+
+
+def test_live_price_from_earlier_day_shows_date():
+    a = decide("SAFE", {**P, "arrival_date": "2026-10-27"})
+    assert "Today" not in a.text_en and "27-10-2026" in a.text_en
+
+
+def test_cached_price_marked_old_in_marathi():                         # approved wording, Latin-digit date
+    a = decide("SAFE", {**P, "source": "cache", "arrival_date": "2026-10-28", "modal": 1500})
+    assert "28-10-2026 रोजीचा लासलगाव भाव ₹1500/क्विंटल (जुना भाव)." in a.text_mr
+    assert "(old rate)" in a.text_en and "Today" not in a.text_en
+
+
+def test_live_dated_price_has_no_old_marker():
+    a = decide("SAFE", {**P, "arrival_date": "2026-10-28", "modal": 1500})
+    assert "28-10-2026 रोजीचा लासलगाव भाव ₹1500/क्विंटल." in a.text_mr and "जुना" not in a.text_mr
+
+
+def test_fallback_price_never_in_farmer_message():
+    a = decide("SAFE", {**P, "source": "fallback", "arrival_date": None, "modal": 1850})
+    assert "1850" not in a.text_mr and "1850" not in a.text_en and "भाव" not in a.text_mr

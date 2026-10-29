@@ -1,0 +1,109 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kanda Rakshak Department View</title>
+<style>
+  :root { --navy:#1B2A5C; --orange:#F28C28; --bg:#F4F6FB; --card:#fff; --border:#D9DEEA; --ink:#1F2937; --muted:#6B7280;
+          --green:#2E7D4F; --amber:#C77700; --red:#C0392B; --grey:#6B7280; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family: Arial, "Noto Sans Devanagari", sans-serif; background:var(--bg); color:var(--ink); }
+  header { background:var(--navy); color:#fff; padding:12px 20px; display:flex; gap:16px; align-items:center; flex-wrap:wrap; }
+  header a { color:#C9D2EC; text-decoration:none; font-size:14px; } header a.on { color:#fff; font-weight:bold; border-bottom:2px solid var(--orange); }
+  header h1 { font-size:18px; margin:0 8px 0 0; } header h1 span { color:var(--orange); }
+  .sim { background:#FFE9C7; color:#8A4B00; font-size:12px; font-weight:bold; padding:3px 10px; border-radius:999px; }
+  main { max-width:1280px; margin:0 auto; padding:16px; display:grid; gap:14px; grid-template-columns: repeat(12, 1fr); }
+  .card { background:var(--card); border:1px solid var(--border); border-radius:12px; padding:14px; min-width:0; }
+  .k { grid-column: span 3; } .map { grid-column: span 5; } .tbl { grid-column: span 7; }
+  @media (max-width: 900px) { .k { grid-column: span 6; } .map, .tbl { grid-column: span 12; } }
+  h2 { font-size:12px; text-transform:uppercase; letter-spacing:.07em; color:var(--muted); margin:0 0 8px; }
+  .big { font-size:34px; font-weight:bold; color:var(--navy); font-variant-numeric: tabular-nums; }
+  .muted { color:var(--muted); font-size:12px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th { text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--muted); padding:6px; border-bottom:1px solid var(--border); }
+  td { padding:7px 6px; border-bottom:1px solid #EEF0F5; vertical-align:middle; }
+  tr:hover td { background:#F7F8FB; }
+  .pill { color:#fff; font-weight:bold; font-size:11px; padding:2px 8px; border-radius:999px; }
+  .ROT { background:var(--red); } .WATCH { background:var(--amber); } .SAFE { background:var(--green); } .UNKNOWN { background:var(--grey); }
+  .bar { height:6px; background:#EEF0F5; border-radius:99px; width:70px; overflow:hidden; display:inline-block; vertical-align:middle; margin-left:6px; }
+  .bar i { display:block; height:100%; }
+  .off { color:var(--red); font-weight:bold; }
+  a.open { color:var(--navy); font-weight:bold; text-decoration:none; }
+  .scroll { overflow-x:auto; }
+  svg text { font-family: Arial, sans-serif; }
+</style>
+</head>
+<body>
+<header>
+  <h1>कांदा रक्षक <span>Department / FPO view</span></h1>
+  <a href="/">Shed</a><a href="/farmer">Farmer app</a><a class="on" href="/dept">Department</a>
+  <span class="sim" id="simflag" hidden>Includes SIMULATED sheds (digital twin)</span>
+  <span class="muted" style="color:#C9D2EC" id="upd"></span>
+</header>
+<main>
+  <section class="card k"><h2>Sheds monitored</h2><div class="big" id="kSheds">—</div><div class="muted" id="kOnline"></div></section>
+  <section class="card k"><h2>Onion under watch</h2><div class="big" id="kTonnes">—</div><div class="muted">tonnes in monitored sheds</div></section>
+  <section class="card k"><h2>Stock at risk now</h2><div class="big" id="kRisk" style="color:var(--red)">—</div><div class="muted" id="kRiskN"></div></section>
+  <section class="card k"><h2>Mandi price</h2><div class="big" id="kPrice">—</div><div class="muted" id="kPmeta"></div></section>
+
+  <section class="card map"><h2>Sheds on the map (Nashik onion belt)</h2><div id="map"></div>
+    <div class="muted">Schematic: positions from shed GPS; colour = rot risk.</div></section>
+  <section class="card tbl"><h2>Sheds needing action first</h2>
+    <div class="scroll"><table><thead><tr><th>Shed</th><th>Village</th><th>Stock</th><th>Risk</th><th>Advice now</th><th>Fan</th><th>Status</th><th></th></tr></thead><tbody id="rows"></tbody></table></div>
+  </section>
+</main>
+<script>
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, ch => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[ch]);
+const COL = { ROT:'#C0392B', WATCH:'#C77700', SAFE:'#2E7D4F', UNKNOWN:'#6B7280' };
+const LVL = l => Object.hasOwn(COL, l) ? l : 'UNKNOWN';   // whitelist: risk_level goes into class/fill attributes
+const num = v => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
+const ACT = { HOLD:'Hold', CONSIDER_SELL:'Consider selling', VENTILATE:'Check / ventilate', SELL_SOON:'Sell this week', SORT_SELL:'Sort today', NO_DATA:'Check device' };
+function drawMap(devs) {
+  const pts = devs.filter(d => d.lat != null && d.lon != null);
+  const W = 520, H = 360, pad = 40;
+  const lat0 = 19.75, lat1 = 20.75, lon0 = 73.85, lon1 = 74.7;
+  const x = lon => pad + (lon - lon0) / (lon1 - lon0) * (W - 2 * pad);
+  const y = lat => H - pad - (lat - lat0) / (lat1 - lat0) * (H - 2 * pad);
+  let g = '';
+  for (let la = 19.8; la <= 20.71; la += 0.2) g += `<line x1="${pad}" x2="${W - pad}" y1="${y(la)}" y2="${y(la)}" stroke="#E6E9F0"/><text x="4" y="${y(la) + 4}" font-size="10" fill="#9AA3B5">${la.toFixed(1)}°N</text>`;
+  for (let lo = 73.9; lo <= 74.71; lo += 0.2) g += `<line y1="${pad}" y2="${H - pad}" x1="${x(lo)}" x2="${x(lo)}" stroke="#E6E9F0"/><text x="${x(lo) - 14}" y="${H - 10}" font-size="10" fill="#9AA3B5">${lo.toFixed(1)}°E</text>`;
+  const dots = pts.map(d => {
+    const lvl = LVL(d.risk_level);
+    const r = 7 + Math.min(10, (num(d.tonnes) || 20) / 4);
+    return `<a href="/?device=${encodeURIComponent(d.device_id)}"><circle cx="${x(num(d.lon))}" cy="${y(num(d.lat))}" r="${r}" fill="${COL[lvl]}" fill-opacity="0.85" stroke="#fff" stroke-width="2">
+      <title>${esc(d.device_id)} · ${esc(d.village)} · ${lvl} ${Math.round(num(d.risk_score))}</title></circle>
+      <text x="${x(num(d.lon)) + r + 4}" y="${y(num(d.lat)) + 4}" font-size="11" fill="#1F2937">${esc(d.village)}</text></a>`;
+  }).join('');
+  $('map').innerHTML = `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Map of monitored sheds"><rect x="${pad}" y="${pad}" width="${W - 2 * pad}" height="${H - 2 * pad}" fill="#FAFBFD" stroke="#D9DEEA" rx="8"/>${g}${dots}</svg>`;
+}
+async function refresh() {
+  const f = await (await fetch('/api/v1/fleet')).json();
+  const devs = f.devices;
+  $('simflag').hidden = !devs.some(d => d.simulated);
+  $('upd').textContent = 'Updated ' + new Date().toLocaleTimeString('en-IN', {timeZone:'Asia/Kolkata'});
+  const online = devs.filter(d => d.online).length;
+  const tonnes = devs.reduce((s, d) => s + (d.tonnes || 0), 0);
+  const risky = devs.filter(d => d.risk_level === 'ROT' || d.risk_level === 'WATCH');
+  $('kSheds').textContent = devs.length; $('kOnline').textContent = `${online} online · ${devs.length - online} offline`;
+  $('kTonnes').textContent = tonnes.toLocaleString('en-IN') + ' t';
+  $('kRisk').textContent = risky.reduce((s, d) => s + (d.tonnes || 0), 0).toLocaleString('en-IN') + ' t';
+  $('kRiskN').textContent = `in ${risky.length} shed(s) at WATCH or ROT`;
+  if (f.price) { $('kPrice').textContent = `₹${Math.round(f.price.modal).toLocaleString('en-IN')}/q`; $('kPmeta').textContent = `${f.price.view.heading_en} · ${f.price.market} · source: ${f.price.source}`; }
+  else { $('kPrice').textContent = '—'; $('kPmeta').textContent = 'price not available'; }
+  drawMap(devs);
+  $('rows').innerHTML = devs.map(d => { const lvl = LVL(d.risk_level), t = num(d.tonnes); return `<tr>
+    <td><b>${esc(d.device_id)}</b>${d.simulated ? ' <span class="muted">SIM</span>' : ''}${d.control && !d.control.kit_on ? '<br><span class="muted">kit OFF (comparison)</span>' : ''}</td>
+    <td>${esc(d.village || '—')}<br><span class="muted">${esc(d.taluka)}</span></td>
+    <td>${t ? t + ' t' : '—'}</td>
+    <td><span class="pill ${lvl}">${lvl}</span><span class="bar"><i style="width:${Math.round(num(d.risk_score))}%;background:${COL[lvl]}"></i></span></td>
+    <td>${esc(ACT[d.action] || d.action)}</td>
+    <td>${d.fan_on ? 'ON' : 'off'}</td>
+    <td>${d.online ? 'online' : '<span class="off">offline</span>'}</td>
+    <td><a class="open" href="/?device=${encodeURIComponent(d.device_id)}">Open ›</a></td></tr>`; }).join('');
+}
+refresh(); setInterval(refresh, 5000);
+</script>
+</body>
+</html>

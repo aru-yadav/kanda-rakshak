@@ -20,6 +20,12 @@ RH_LOW, RH_HIGH = 70.0, 90.0
 HOTSPOT_FULL_C = 4.0
 WATCH_AT, ROT_AT = 35.0, 65.0
 LAYERS = ("top", "mid", "bot")
+FORMULAS = {
+    "gas": "100 * clamp((mv - base) / base / 0.60, 0, 1)   [worst of MQ-135, MQ-136]",
+    "humid": "100 * clamp((rh - 70) / (90 - 70), 0, 1)   [most humid heap layer]",
+    "heat": "100 * clamp((t_hot - t_ref) / 4.0, 0, 1)   [hottest layer vs outside, else coolest layer]",
+    "score": "sum(weight * value) / sum(weight of available components)",
+}
 
 
 @dataclass
@@ -29,6 +35,7 @@ class Risk:
     components: dict = field(default_factory=dict)
     worst_layer: Optional[str] = None
     reasons: list = field(default_factory=list)
+    inputs: dict = field(default_factory=dict)   # per component: the exact values its formula used
 
 
 def _clamp01(x: float) -> float:
@@ -54,12 +61,17 @@ def compute(layers: dict, gas: dict) -> Risk:
     gas: {'mq135_mv','mq136_mv','mq135_base_mv','mq136_base_mv'} (values may be None)"""
     comps: dict[str, float] = {}
     reasons: list[str] = []
+    inputs: dict[str, dict] = {}
 
-    rises = [r for r in (_gas_rise(gas.get("mq135_mv"), gas.get("mq135_base_mv")),
-                         _gas_rise(gas.get("mq136_mv"), gas.get("mq136_base_mv"))) if r is not None]
+    rise_by = {s: _gas_rise(gas.get(f"{s}_mv"), gas.get(f"{s}_base_mv")) for s in ("mq135", "mq136")}
+    rises = [r for r in rise_by.values() if r is not None]
     if rises:
         rise = max(rises)
         comps["gas"] = round(100 * _clamp01(rise / GAS_FULL_RISE), 1)
+        sensor = max((s for s in rise_by if rise_by[s] is not None), key=lambda s: rise_by[s])
+        inputs["gas"] = {"sensor": sensor, "mv": gas.get(f"{sensor}_mv"), "base_mv": gas.get(f"{sensor}_base_mv"),
+                         "rise_pct": round(100 * rise, 1), "full_at_pct": 100 * GAS_FULL_RISE,
+                         "rise_pct_by_sensor": {s: (None if r is None else round(100 * r, 1)) for s, r in rise_by.items()}}
         if rise > 0.15:
             reasons.append(f"rot gas {rise * 100:.0f}% above fresh baseline")
 
@@ -72,6 +84,7 @@ def compute(layers: dict, gas: dict) -> Risk:
         worst_layer = max(rhs, key=rhs.get)
         rh = rhs[worst_layer]
         comps["humid"] = round(100 * _clamp01((rh - RH_LOW) / (RH_HIGH - RH_LOW)), 1)
+        inputs["humid"] = {"layer": worst_layer, "rh": rh, "rh_low": RH_LOW, "rh_high": RH_HIGH}
         if rh > 80:
             reasons.append(f"high humidity {rh:.0f}% in {worst_layer} layer")
 
@@ -82,6 +95,9 @@ def compute(layers: dict, gas: dict) -> Risk:
         if ref is not None:
             hotspot = temps[hot_layer] - ref
             comps["heat"] = round(100 * _clamp01(hotspot / HOTSPOT_FULL_C), 1)
+            inputs["heat"] = {"hot_layer": hot_layer, "t_hot": temps[hot_layer], "t_ref": ref,
+                              "ref": "ambient" if amb_t is not None else "coolest layer",
+                              "hotspot_c": round(hotspot, 2), "full_at_c": HOTSPOT_FULL_C}
             if hotspot > 1.5:
                 reasons.append(f"{hot_layer} layer {hotspot:.1f}°C warmer than {'outside' if amb_t is not None else 'coolest layer'}")
                 if comps["heat"] >= comps.get("humid", 0):
@@ -94,4 +110,5 @@ def compute(layers: dict, gas: dict) -> Risk:
     score = round(sum(WEIGHTS[k] * v for k, v in comps.items()) / wsum, 1)
     if not reasons:
         reasons.append("conditions normal")
-    return Risk(score=score, level=level_for(score), components=comps, worst_layer=worst_layer, reasons=reasons)
+    return Risk(score=score, level=level_for(score), components=comps, worst_layer=worst_layer, reasons=reasons,
+                inputs=inputs)
