@@ -1,5 +1,12 @@
 # Kanda Rakshak (कांदा रक्षक): Smart Onion Storage Guard
 
+## 🏆 Awards
+
+**1st Prize, InnovateX 2.0 Inter-College Project Competition**, IEEE EMBS Pune Chapter × MIT-ADT University, School of Computing (30 Oct 2026)
+
+<img src="docs/awards/innovatex-2026-1st-prize.jpg" alt="InnovateX 2.0 1st Prize certificates for Kanda Rakshak" width="360">
+
+
 **Seva First Innovation Challenge 2026 (Maharashtra)** · Sector 1 Agriculture · Sub-theme 5: Post-Harvest Loss, Storage and Price Protection
 
 A low-cost (≈₹7,900, BOM in progress) retrofit kit that turns a farmer's existing onion shed (kanda chawl) into a smart store:
