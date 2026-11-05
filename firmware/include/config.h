@@ -7,6 +7,7 @@
 
 // ---- DHT22 (AM2302) temperature / humidity, powered from 3V3 ----
 // Pins match docs/hardware/wiring-poc.png. GPIO 25/27 are ADC2 but fine as digital.
+// GPIO 25/26 are also the DAC pins: do not enable the DAC on GPIO 25/26.
 #define PIN_DHT_TOP      32   // heap top layer
 #define PIN_DHT_MID      33   // heap middle layer
 #define PIN_DHT_BOT      25   // heap bottom layer
