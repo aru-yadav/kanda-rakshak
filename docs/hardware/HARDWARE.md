@@ -243,7 +243,7 @@ Status: **designed, not built.** Prices approximate, Nov 2026.
 | GST 18 % | 1.49 |
 | **Total** | **9.74** (quoted as ₹9.7 lakh) |
 
-The itemised BOM came out at ≈ ₹18,750 per kit, above the ₹17,000 used here. If quotes hold, the pilot uses a farmer/FPO **co-pay** or falls back to **38 kits** (see EVIDENCE.md).
+The itemised BOM came out at ≈ ₹18,750 per kit, above the ₹17,000 used here. The pilot keeps **40 kits**; an FPO/farmer **co-pay of ≈ ₹1,750 per kit** (≈ ₹0.7 lakh total) covers the gap. Backup: **36 kits** without co-pay (see EVIDENCE.md).
 
 **Fan voltage (decided 5 Nov 2026): 12/24 V DC BLDC fans by default.** They run from the grid through a DC power supply, so no mains wiring goes into the damp shed (same reasoning as v1, see TECH_STACK.md). Switch them with a logic-level MOSFET or DC SSR, with a fuse per fan line.
 **230 V AC fans: option only** for FPO stores that already have wiring. Only with a 30 mA RCD/RCCB, a proper earth, a correctly rated SSR with its own fuse, an IP65 enclosure for every mains part, no mains wiring inside the heap, and installation by a licensed electrician. Either way, the install must pass `hardware-safety-reviewer` and a human check first.

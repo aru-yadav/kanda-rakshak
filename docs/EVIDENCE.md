@@ -25,7 +25,7 @@ Status column: **verified** = we read the primary source; **to verify** = second
 | Godaam Sense reported at ₹10,000 per device covering ~5–10 t (may include service); sensing only | JURY_PREP §12, deck | Kisan of India; Krishi Jagran | News | to verify (add links + dates). No hard per-tonne comparison |
 | Pilot budget ₹9.74 lakh (quoted ₹9.7 L) for 40 kit + 20 control chawls | JURY_PREP §16, deck slide 4 | our pilot budget; breakdown in HARDWARE.md Part B | Our estimate | itemised |
 | PoC bench kit ₹11,500; field kit ≈₹17,000–19,000 for 25 t (≈₹700–750/t); 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k | README, HARDWARE.md, JURY_PREP, deck | our estimate, approximate retail prices Nov 2026 | Our estimate | line-item BOM in HARDWARE.md Part B: **≈₹18,750** incl. BME688 (₹1,200) + TCA9548A (₹150) |
-| Pilot uses ₹17,000 per kit (as presented on the deck) though the itemised BOM is ≈₹18,750 | HARDWARE.md pilot budget, deck slide 4 | our budget | Our estimate | gap ≈ ₹70,000 over 40 kits: covered by farmer/FPO co-pay, or fall back to 38 kits. **Check:** 38 × ₹18,750 = ₹7.13 L, still ≈ ₹0.33 L over the ₹6.80 L kit line (to be covered from spares/co-pay); 36 kits (₹6.75 L) fit with no co-pay |
+| Pilot uses ₹17,000 per kit (as presented on the deck) though the itemised BOM is ≈₹18,750 | HARDWARE.md pilot budget, deck slide 4 | our budget | Our estimate | **Decided:** keep 40 kits; FPO/farmer co-pay ≈ ₹1,750 per kit covers the gap (40 × ₹1,750 ≈ ₹0.7 L). Backup: 36 kits (36 × ₹18,750 = ₹6.75 L) fit the ₹6.80 L kit line without co-pay |
 | Onion price ₹15/kg used in the ₹75,000 savings example | JURY_PREP §11 | assumption | Assumption | replace with a dated Agmarknet modal price |
 
 ## Pitch deck numbers (deck as presented 30 Oct 2026; deck not edited)
