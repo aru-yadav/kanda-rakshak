@@ -31,12 +31,12 @@ A low-cost retrofit kit (field kit ≈₹700 per tonne of storage) that turns a 
 
 | Part | Status |
 |---|---|
-| Backend (FastAPI), rule-based rot-risk score, Marathi advisory, `/explain` decision trace | ✅ Built, 67 automated tests passing |
+| Backend (FastAPI), rule-based rot-risk score, Marathi advisory, `/explain` decision trace | ✅ Built, 79 automated tests passing |
 | Live mandi price (data.gov.in Agmarknet) | ✅ Integrated, with cache and fallback labels |
 | Farmer app, shed dashboard, department/FPO dashboard | ✅ Built |
 | Digital twin: 8 simulated sheds around Nashik | ✅ Running. Heap model with assumed coefficients; fan rule modelled on the firmware (not yet verified against it) |
 | SMS / voice call for keypad phones | 📅 Planned (demo uses Telegram) |
-| ESP32 firmware + hardware (DHT22 ×4, MQ-135/136, solar fan) | 🔧 Firmware written (compile pending), hardware being assembled |
+| ESP32 firmware + hardware (DHT22 ×4, MQ-135/136, solar fan) | 🔧 Firmware written, `pio run` passes (PR #2), hardware being assembled |
 | Field pilot (40 kit + 20 control chawls, Niphad–Lasalgaon) | 📅 Proposed |
 
 All demo data comes from the digital twin and is labelled **SIMULATED** in the UI. Twin results (e.g. kit ON vs OFF) come from a model with assumed numbers, not from measurements.

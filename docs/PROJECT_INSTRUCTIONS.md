@@ -66,7 +66,7 @@ Kanda Rakshak (कांदा रक्षक) is a retrofit kit for onion stor
 
 | Area | Status |
 |---|---|
-| Backend, rot-risk, advisory, Agmarknet price, notifier, `/explain`, dashboards, digital twin, hosted demo page | Built; 41 tests |
-| Firmware | Written, compile pending |
+| Backend, rot-risk, advisory, Agmarknet price, notifier, `/explain`, dashboards, digital twin, hosted demo page | Built; 79 tests |
+| Firmware | Written, `pio run` passes (PR #2) |
 | Hardware kit | PoC circuit drawn (`docs/hardware/wiring-poc.png`), budget ₹11,500 (kit ₹7,910 + testing ₹3,590). Field kit v2 designed, ≈₹700/t |
 | Field pilot | Proposed: 40 kit + 20 control chawls, Niphad–Lasalgaon |
