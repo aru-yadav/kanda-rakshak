@@ -11,12 +11,12 @@
 #define PIN_DHT_BOT      17   // heap bottom layer
 #define PIN_DHT_AMB      18   // ambient, outside the heap, shaded
 
-// ---- MQ gas sensors, powered from 5 V, analog out via 10k/20k divider ----
+// ---- MQ gas sensors, powered from 5 V, analog out via 12k/10k divider ----
 // ADC1 pins only (ADC2 is unusable while WiFi is on).
 #define PIN_MQ135        34   // VOC / NH3
 #define PIN_MQ136        35   // H2S / sulphur volatiles (optional)
 #define MQ136_INSTALLED  true
-#define MQ_DIVIDER_RATIO 1.5f // Vsensor = Vpin * (10k+20k)/20k
+#define MQ_DIVIDER_RATIO 2.2f // (12k + 10k) / 10k, matches wiring-poc.png
 
 // ---- Fan via logic-level MOSFET module (D4184 / AO3400), NOT IRF520 ----
 #define PIN_FAN          25
