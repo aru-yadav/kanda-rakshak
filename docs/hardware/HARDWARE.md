@@ -2,7 +2,7 @@
 
 Two builds:
 - **Part A — PoC (bench):** what we build and test now, ₹11,500.
-- **Part B — Field kit v2:** for a real 25 t chawl, ≈₹17,000 (≈₹700/t). Designed, not built.
+- **Part B — Field kit v2:** for a real 25 t chawl, ≈₹17,000–19,000 (≈₹700–750 per tonne). Designed, not built.
 
 All prices are **approximate, Nov 2026** (retail, Pune / online). Recheck when ordering.
 
@@ -197,7 +197,7 @@ The firmware multiplies by `MQ_DIVIDER_RATIO = 2.2` ((12k + 10k) / 10k) to repor
 
 ---
 
-# Part B — Field kit v2 (25 t chawl, ≈₹17,000, ≈₹700/t)
+# Part B — Field kit v2 (25 t chawl, ≈₹17,000–19,000 (≈₹700–750 per tonne))
 
 Status: **designed, not built.** Prices approximate, Nov 2026.
 
@@ -207,10 +207,10 @@ Status: **designed, not built.** Prices approximate, Nov 2026.
 | Heap temp/RH | **4 × SHT40** with **PTFE membrane caps**, via **TCA9548A** I2C mux | The SHT40s share one I2C address, so the mux gives each its own channel. PTFE keeps dust and condensation off the sensor |
 | Heap core temperature | **DS18B20 string** (one-wire, 4.7 kΩ pull-up) | Several probes down the heap for heat spots (ΔT) |
 | CO₂ | **SCD41** (I2C) | Respiration rise during fan-off windows |
-| Sulphur / VOC | **BME688** (I2C) | Tells rot from sprouting. **MQ-136** is an option where there is grid power (heater draw) |
-| Fans | **2–3 × 300 mm** fans blowing into an **under-floor plenum** | Switched by SSR / logic-level MOSFET on two outputs. Sizing target 1–2 m³/min of air per m³ of onions (see EVIDENCE.md) |
+| Sulphur / VOC | **BME688** (I2C) | Tells rot from sprouting. **MQ-136** is the alternative where there is grid power (heater draw) |
+| Fans | **2–3 × 300 mm 12/24 V DC BLDC** fans blowing into an **under-floor plenum** | Switched by logic-level MOSFET / DC SSR on two outputs. Sizing target 1–2 m³/min of air per m³ of onions (see EVIDENCE.md) |
 | Network | **A7670C** 4G/2G modem on UART2 | **Its own 4 V / 2 A buck** (2 A transmit bursts); never powered from the 3.3 V or 5 V logic rail |
-| Power | Fans on **grid**; **10–20 W solar** + battery for the electronics | Through a power cut, the electronics keep sensing, logging and deciding. The **fans can't run** until the grid returns. Main fuse at **battery +** |
+| Power | Fans: **grid → 12/24 V DC supply** (no mains in the shed); **10–20 W solar** + battery for the electronics | Through a power cut, the electronics keep sensing, logging and deciding. The **fans can't run** until the grid returns. Main fuse at **battery +** |
 
 ### Field kit BOM (25 t chawl, approximate, Nov 2026)
 
@@ -224,17 +224,17 @@ Status: **designed, not built.** Prices approximate, Nov 2026.
 | A7670C 4G modem | 1,700 |
 | Electronics solar + LiFePO₄ | 2,500 |
 | SSR / MOSFET switching | 800 |
-| 2–3 × 300 mm fans | 6,000 |
+| 2–3 × 300 mm 12/24 V DC BLDC fans | 6,000 |
 | IP65 box, PCB, surge protection | 1,500 |
-| **Total** | **≈ 17,400** (quoted as ≈ ₹17,000, ≈ ₹700/t) |
-
-Not itemised yet: the **BME688** sulphur sensor (or MQ-136 on grid power) and the TCA9548A mux. Add them when the parts are quoted.
+| BME688 sulphur/VOC sensor (alternative: MQ-136 ≈ ₹600 on grid power) | 1,200 |
+| TCA9548A I2C mux | 150 |
+| **Total** | **≈ 18,750** → quoted as ≈₹17,000–19,000 (≈₹700–750 per tonne) |
 
 ### Pilot budget (40 kit + 20 control chawls)
 
 | Item | ₹ lakh |
 |---|---|
-| 40 kits × ₹17,000 | 6.80 |
+| 40 kits × ₹17,000 (as presented on the deck) | 6.80 |
 | Install + training | 0.30 |
 | SIM / IVR / cloud, 8 months | 0.45 |
 | Weigh-in / weigh-out audit, 60 chawls | 0.45 |
@@ -243,10 +243,10 @@ Not itemised yet: the **BME688** sulphur sensor (or MQ-136 on grid power) and th
 | GST 18 % | 1.49 |
 | **Total** | **9.74** (quoted as ₹9.7 lakh) |
 
-**Mains safety (open decision: fan voltage).** A grid-powered 300 mm fan is usually **230 V AC**, and that means mains in a damp shed, which v1 avoided (see TECH_STACK.md). Choose one before building:
-- **12/24 V DC fans** from a grid power supply (**preferred**: keeps mains out of the shed), or
-- **230 V AC fans**, installed by a licensed electrician, with: a 30 mA RCD/RCCB, a proper earth, a correctly rated SSR with its own fuse, an IP65 enclosure for every mains part, and no mains wiring inside the heap.
-This must pass `hardware-safety-reviewer` and a human electrician before any field install.
+The itemised BOM came out at ≈ ₹18,750 per kit, above the ₹17,000 used here. If quotes hold, the pilot uses a farmer/FPO **co-pay** or falls back to **38 kits** (see EVIDENCE.md).
+
+**Fan voltage (decided 5 Nov 2026): 12/24 V DC BLDC fans by default.** They run from the grid through a DC power supply, so no mains wiring goes into the damp shed (same reasoning as v1, see TECH_STACK.md). Switch them with a logic-level MOSFET or DC SSR, with a fuse per fan line.
+**230 V AC fans: option only** for FPO stores that already have wiring. Only with a 30 mA RCD/RCCB, a proper earth, a correctly rated SSR with its own fuse, an IP65 enclosure for every mains part, no mains wiring inside the heap, and installation by a licensed electrician. Either way, the install must pass `hardware-safety-reviewer` and a human check first.
 
 **Pin note (do not wire from this yet).** The v2 design was sketched on classic-ESP32 numbering: fan outputs **GPIO 26 / 19**, modem **UART2 TX/RX GPIO 17 / 16**. These numbers don't carry over to C3/S3. On most S3 modules GPIO 26 is flash/PSRAM and GPIO 19 is USB D−. On the C3, GPIO 16/17 are flash pins. Make a final pin map for the chosen chip, pass it through `hardware-safety-reviewer`, and put it in `config.h` before any PCB or wiring.
 
@@ -255,7 +255,7 @@ This must pass `hardware-safety-reviewer` and a human electrician before any fie
 | Chawl size | Kit cost | Per tonne |
 |---|---|---|
 | 5 t | ≈ ₹9–10k | ≈ ₹1,800–2,000/t |
-| **25 t** | **≈ ₹16–19k (design point ≈ ₹17,000)** | **≈ ₹700/t** |
+| **25 t** | **≈ ₹17–19k (itemised ≈ ₹18,750)** | **≈ ₹700–750/t** |
 | 100 t | ≈ ₹45–65k | ≈ ₹450–650/t |
 
 Fans and plenum scale with tonnage; the controller, sensors and modem cost about the same at any size.

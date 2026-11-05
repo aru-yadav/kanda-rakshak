@@ -38,7 +38,7 @@ The farmer also doesn't know when to sell. If he sells too early he gets a low p
 | Digital twin: 8 virtual sheds around Nashik | **Running**. Fan rule modelled on our firmware fan rule (not yet verified against it); heap behaviour uses assumed values, to be calibrated in the pilot |
 | ESP32 firmware (sensors, fan control, offline buffer) | **Written and compiles** (`pio run`); not yet run on the assembled hardware. Runs the **v1** fan rule |
 | PoC hardware (bench) | **Final circuit drawn** (`docs/hardware/wiring-poc.png`), budget **₹11,500**; being assembled |
-| Field kit v2 (25 t chawl) | **Designed, not built**: ≈₹17,000 incl. fans ≈ **₹700 per tonne** |
+| Field kit v2 (25 t chawl) | **Designed, not built**: ≈₹17,000–19,000 incl. fans (≈ **₹700–750 per tonne**) |
 | Field pilot | **Proposed**: 40 kit chawls + 20 control chawls, Niphad–Lasalgaon, budget **₹9.7 lakh** |
 
 **Why a digital twin?** "Rot takes weeks to happen in a real shed. We built a simple model of an onion heap so we could test every situation (humid monsoon, rot starting, network cut) in minutes. Its fan rule is modelled on our firmware fan rule (not yet verified against it), and the heap behaviour uses assumed values that we will calibrate in the pilot. When the hardware is installed, the same software takes real readings with zero changes. The device sends exactly the same data format."
@@ -153,7 +153,7 @@ The weights and thresholds are our starting values, to be **calibrated in the pi
 **v2 (planned, not in the demo): dew-point rule.** The fan runs only when the outside air's dew point is safely below the onion surface temperature. This **condensation guard** means the fan never wets the onions. The firmware and the digital twin will share one set of test vectors for this rule.
 
 - **PoC:** one small **12 V DC** fan, switched by a relay.
-- **Field kit v2:** 2–3 × 300 mm fans blowing into an under-floor plenum, run on **grid** power. A **10–20 W solar** panel powers the electronics, so sensing, logging and alerts keep working through power cuts; the fans themselves need the grid. Fan voltage (12/24 V DC vs 230 V AC with mains safety) is still an open design decision.
+- **Field kit v2:** 2–3 × 300 mm **12/24 V DC BLDC** fans blowing into an under-floor plenum, powered from the grid through a DC supply, so no mains goes into the shed. A **10–20 W solar** panel powers the electronics, so sensing, logging and alerts keep working through power cuts; the fans themselves need the grid. 230 V AC fans are an option only for FPO stores with existing wiring, and only with a 30 mA RCD, earthing, IP65 and a licensed electrician.
 - **Why fans work (not our result):** NHRDF's fan-ventilated store at Sinnar lost **14.52 %** vs **33.40 %** in conventional storage over 6 months (*Vegetable Science* 47(2), 2020). Our kit adds automatic control and price-linked advice on top.
 
 ### 9. How does it work without internet?
@@ -172,9 +172,9 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 ### 11. What does the kit cost and who pays?
 
 - **PoC bench build:** ₹11,500.
-- **Field kit v2:** ≈ **₹17,000 for a 25 t chawl, including fans**, so ≈ **₹700 per tonne** (approximate, Nov 2026). It scales: 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k.
+- **Field kit v2:** ≈ **₹17,000–19,000 for a 25 t chawl, including fans** (≈ **₹700–750 per tonne**), approximate, Nov 2026. Itemised BOM ≈ ₹18,750. It scales: 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k.
 - Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at an **assumed ₹15/kg** is about ₹75,000 in one season (price assumption, see EVIDENCE.md; use the live Agmarknet price on the day). **This is a target, to be measured in the pilot.** Target payback: **< 1 season**.
-- For scale: the kit is **≈7% of a 25 t chawl's cost norm** (25 t × ₹10,000/t MIDH cost norm = ₹2.5 lakh; ₹17,000 / ₹2.5 lakh ≈ 6.8 %). The MIDH figure is as reported by Agrowon, Apr 2025; verify it against the GR.
+- For scale: the kit is **≈7% of a 25 t chawl's cost norm** (25 t × ₹10,000/t MIDH cost norm = ₹2.5 lakh; ₹17,000–19,000 / ₹2.5 lakh ≈ 6.8–7.6 %). The MIDH figure is as reported by Agrowon, Apr 2025; verify it against the GR.
 - **Who pays** (details in `docs/BUSINESS.md`; all proposals, not yet validated):
   - **FPOs, pay-per-tonne:** the FPO installs kits in member chawls and charges per tonne stored per season. The fee will be set from pilot data.
   - **Government:** a retrofit component under the MIDH onion-storage subsidy (scheme rules still to be checked against the GR), and condition monitoring of Government buffer stocks.

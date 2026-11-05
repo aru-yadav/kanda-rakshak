@@ -11,7 +11,7 @@
 
 **Seva First Innovation Challenge 2026 (Maharashtra)** · Sector 1 Agriculture · Sub-theme 5: Post-Harvest Loss, Storage and Price Protection
 
-A low-cost retrofit kit (field kit ≈₹700 per tonne of storage) that turns a farmer's existing onion shed (kanda chawl) into a smart store:
+A low-cost retrofit kit (field kit ≈₹700–750 per tonne of storage) that turns a farmer's existing onion shed (kanda chawl) into a smart store:
 
 - **Watches** heat, humidity and rot gas at the top, middle and bottom of the onion heap
 - **Acts** on its own: switches ventilation fans on when outside air is drier, even with no network
@@ -24,7 +24,7 @@ A low-cost retrofit kit (field kit ≈₹700 per tonne of storage) that turns a 
 | | |
 |---|---|
 | PoC bench build | ₹11,500 |
-| Field kit v2 | ≈₹700 per tonne (≈₹17,000 for a 25 t chawl, approximate, Nov 2026) |
+| Field kit v2 | ≈₹17,000–19,000 (≈₹700–750 per tonne) for a 25 t chawl, approximate, Nov 2026 |
 | Pilot (proposed) | 40 kit chawls + 20 control chawls |
 
 ## Status (honest)

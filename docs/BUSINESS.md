@@ -4,7 +4,7 @@ Status: **proposal**. Nothing here is validated by sales or pilot data yet. Ever
 
 ## 1. Who pays, and how
 
-**Pay-per-tonne through FPOs.** The farmer does not buy hardware. The FPO installs the kit in member chawls and charges per tonne stored per season. Hardware cost is about **₹700 per tonne** of capacity for a 25 t chawl (field kit ≈ ₹17,000, approximate, Nov 2026), so the charge per tonne is small next to the value of onions saved. The kit is ≈7% of a 25 t chawl's cost norm (25 t × ₹10,000/t MIDH cost norm = ₹2.5 L; MIDH figure as reported by Agrowon, Apr 2025, verify against GR). Target payback: < 1 season. The per-tonne fee will be set from pilot data, not guessed now.
+**Pay-per-tonne through FPOs.** The farmer does not buy hardware. The FPO installs the kit in member chawls and charges per tonne stored per season. Hardware cost is about **₹700–750 per tonne** of capacity for a 25 t chawl (field kit ≈₹17,000–19,000, approximate, Nov 2026), so the charge per tonne is small next to the value of onions saved. The kit is ≈7% of a 25 t chawl's cost norm (25 t × ₹10,000/t MIDH cost norm = ₹2.5 L; ₹17,000–19,000 / ₹2.5 L ≈ 6.8–7.6 %; MIDH figure as reported by Agrowon, Apr 2025, verify against GR). Target payback: < 1 season. The per-tonne fee will be set from pilot data, not guessed now.
 
 Why FPOs: they already aggregate members, collect fees, sell in bulk, and can maintain kits across many chawls.
 
