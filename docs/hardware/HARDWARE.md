@@ -137,8 +137,9 @@ The firmware multiplies by `MQ_DIVIDER_RATIO = 2.2` ((12k + 10k) / 10k) to repor
 ### Step D — MQ sensors (needs the 5 V rail)
 1. Power off. MQ VCC → **5 V rail**, GND → **GND**, AOUT → **12 kΩ** → node → **10 kΩ** → GND. Leave DOUT unconnected.
 2. **Before** connecting the node to the ESP32, measure it: it must stay **below 2.5 V** (expected max 2.27 V).
-3. Node → GPIO 34 (MQ-135) / GPIO 35 (MQ-136). ESP32 5V/VIN → 5 V rail, GND → GND. Don't power from USB and the rail at the same time.
-4. **Burn-in:** new MQ sensors need 24–48 h powered before readings settle. The firmware also ignores gas for `MQ_WARMUP_MS` after every boot.
+3. Node → GPIO 34 (MQ-135) / GPIO 35 (MQ-136). ESP32 GND → GND rail.
+4. **USB and the rail must never feed the ESP32 5V pin at the same time.** For any test that uses the serial monitor (Steps C–E, bench tests B1–B10): leave the ESP32 **5V pin disconnected from the rail** and power the ESP32 from USB. The rail still feeds the MQ heaters and the relay, and the grounds stay common. Connect ESP32 5V → rail only for standalone runs with USB unplugged.
+5. **Burn-in:** new MQ sensors need 24–48 h powered before readings settle. The firmware also ignores gas for `MQ_WARMUP_MS` after every boot.
 
 ### Step E — Fan via relay
 1. Power off. Relay module: DC+ → **5 V rail**, DC− → **GND**, IN → **GPIO 26**, **10 kΩ from IN to GND**. Trigger jumper on **H**.
@@ -209,7 +210,12 @@ Status: **designed, not built.** Prices approximate, Nov 2026.
 | Sulphur / VOC | **BME688** (I2C) | Tells rot from sprouting. **MQ-136** is an option where there is grid power (heater draw) |
 | Fans | **2–3 × 300 mm** fans blowing into an **under-floor plenum** | Switched by SSR / logic-level MOSFET on two outputs. Sizing target 1–2 m³/min of air per m³ of onions (see EVIDENCE.md) |
 | Network | **A7670C** 4G/2G modem on UART2 | **Its own 4 V / 2 A buck** (2 A transmit bursts); never powered from the 3.3 V or 5 V logic rail |
-| Power | Fans on **grid**; **10–20 W solar** + battery for the electronics | Electronics keep logging and the fan rule keeps running through power cuts. Main fuse at **battery +** |
+| Power | Fans on **grid**; **10–20 W solar** + battery for the electronics | Through a power cut, the electronics keep sensing, logging and deciding. The **fans can't run** until the grid returns. Main fuse at **battery +** |
+
+**Mains safety (open decision: fan voltage).** A grid-powered 300 mm fan is usually **230 V AC**, and that means mains in a damp shed, which v1 avoided (see TECH_STACK.md). Choose one before building:
+- **12/24 V DC fans** from a grid power supply (keeps mains out of the shed), or
+- **230 V AC fans**, installed by a licensed electrician, with: a 30 mA RCD/RCCB, a proper earth, a correctly rated SSR with its own fuse, an IP65 enclosure for every mains part, and no mains wiring inside the heap.
+This must pass `hardware-safety-reviewer` and a human electrician before any field install.
 
 **Pin note (do not wire from this yet).** The v2 design was sketched on classic-ESP32 numbering: fan outputs **GPIO 26 / 19**, modem **UART2 TX/RX GPIO 17 / 16**. These numbers don't carry over to C3/S3. On most S3 modules GPIO 26 is flash/PSRAM and GPIO 19 is USB D−. On the C3, GPIO 16/17 are flash pins. Make a final pin map for the chosen chip, pass it through `hardware-safety-reviewer`, and put it in `config.h` before any PCB or wiring.
 

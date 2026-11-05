@@ -24,4 +24,5 @@ Status column: **verified** = we read the primary source; **to verify** = second
 | MIDH 2025-26 onion storage structure subsidy | BUSINESS.md (MIDH retrofit component) | Agrowon, Apr 2025 | News | **to verify against the Govt GR** before quoting amounts |
 | Godaam (competitor) ≈ ₹1,000–2,000 per tonne, sensing only | BUSINESS.md, JURY_PREP §12 | Kisan of India; Krishi Jagran | News | to verify (add links + dates) |
 | Pilot budget ₹9.7 lakh for 40 kit + 20 control chawls | JURY_PREP §16, deck | our pilot budget | Our estimate | add the line-item budget sheet |
-| PoC bench kit ₹11,500; field kit ≈ ₹17,000 for 25 t (≈ ₹700/t); 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k | README, HARDWARE.md, deck | our BOM, approximate retail prices Nov 2026 | Our estimate | estimate, recheck at order time |
+| PoC bench kit ₹11,500; field kit ≈ ₹17,000 for 25 t (≈ ₹700/t); 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k | README, HARDWARE.md, JURY_PREP, deck | our estimate, approximate retail prices Nov 2026 | Our estimate | **field-kit line-item BOM not yet written**: add it to HARDWARE.md Part B before quoting |
+| Onion price ₹15/kg used in the ₹75,000 savings example | JURY_PREP §11 | assumption | Assumption | replace with a dated Agmarknet modal price |

@@ -153,7 +153,7 @@ The weights and thresholds are our starting values, to be **calibrated in the pi
 **v2 (planned, not in the demo): dew-point rule.** The fan runs only when the outside air's dew point is safely below the onion surface temperature. This **condensation guard** means the fan never wets the onions. The firmware and the digital twin will share one set of test vectors for this rule.
 
 - **PoC:** one small **12 V DC** fan, switched by a relay.
-- **Field kit v2:** 2–3 × 300 mm fans blowing into an under-floor plenum, run on **grid** power. A **10–20 W solar** panel powers the electronics, so sensing and the fan rule keep working through power cuts.
+- **Field kit v2:** 2–3 × 300 mm fans blowing into an under-floor plenum, run on **grid** power. A **10–20 W solar** panel powers the electronics, so sensing, logging and alerts keep working through power cuts; the fans themselves need the grid. Fan voltage (12/24 V DC vs 230 V AC with mains safety) is still an open design decision.
 - **Why fans work (not our result):** NHRDF's fan-ventilated store at Sinnar lost **14.52 %** vs **33.40 %** in conventional storage over 6 months (*Vegetable Science* 47(2), 2020). Our kit adds automatic control and price-linked advice on top.
 
 ### 9. How does it work without internet?
@@ -173,7 +173,7 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 
 - **PoC bench build:** ₹11,500.
 - **Field kit v2:** ≈ **₹17,000 for a 25 t chawl, including fans**, so ≈ **₹700 per tonne** (approximate, Nov 2026). It scales: 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k.
-- Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at ₹15/kg is about ₹75,000 in one season. **This is a target, to be measured in the pilot.**
+- Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at an **assumed ₹15/kg** is about ₹75,000 in one season (price assumption, see EVIDENCE.md; use the live Agmarknet price on the day). **This is a target, to be measured in the pilot.**
 - **Who pays** (details in `docs/BUSINESS.md`; all proposals, not yet validated):
   - **FPOs, pay-per-tonne:** the FPO installs kits in member chawls and charges per tonne stored per season. The fee will be set from pilot data.
   - **Government:** a retrofit component under the MIDH onion-storage subsidy (scheme rules still to be checked against the GR), and condition monitoring of Government buffer stocks.
@@ -182,7 +182,7 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 ### 12. What about competitors?
 
 - Some startups monitor storage temperature and humidity, mostly for warehouses and cold stores, using app dashboards.
-- **Godaam:** about **₹1,000–2,000 per tonne**, for **sensing only** (Kisan of India, Krishi Jagran; to verify before quoting). Our field kit is ≈₹700/t *including* fans and automatic control.
+- **Godaam:** about **₹1,000–2,000 per tonne**, for **sensing only** (Kisan of India, Krishi Jagran; to verify before quoting, including whether it is a one-time price or a per-season fee). Don't compare it with our ≈₹700/t hardware cost until the units match.
 - **What's different about us:**
   1. sensors at three depths inside the onion heap, plus rot gas;
   2. a **decision** (Hold/Sort/Sell) using the live Government price, not just a graph;
