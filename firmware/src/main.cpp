@@ -11,6 +11,7 @@
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
 #include <DHT.h>
+#include <esp_system.h>
 #include "config.h"
 #include "secrets.h"
 
@@ -263,12 +264,30 @@ static void handleSerial() {
 }
 
 // ---------------------------------------------------------------- main
+static const char* resetReasonName(esp_reset_reason_t r) {
+  switch (r) {
+    case ESP_RST_POWERON:   return "power-on";
+    case ESP_RST_EXT:       return "external pin";
+    case ESP_RST_SW:        return "software";
+    case ESP_RST_PANIC:     return "panic";
+    case ESP_RST_INT_WDT:   return "interrupt watchdog";
+    case ESP_RST_TASK_WDT:  return "task watchdog";
+    case ESP_RST_WDT:       return "other watchdog";
+    case ESP_RST_DEEPSLEEP: return "deep sleep";
+    case ESP_RST_BROWNOUT:  return "brown-out";
+    case ESP_RST_SDIO:      return "SDIO";
+    default:                return "unknown";
+  }
+}
+
 void setup() {
+  digitalWrite(PIN_FAN, LOW);                  // latch LOW before enabling the output: fan OFF at boot, always
+  pinMode(PIN_FAN, OUTPUT);
   Serial.begin(115200);
   delay(300);
   Serial.printf("\n=== Kanda Rakshak fw %s | device %s ===\n", FW_VERSION, DEVICE_ID);
-  pinMode(PIN_FAN, OUTPUT);
-  digitalWrite(PIN_FAN, LOW);                  // fan OFF at boot, always
+  esp_reset_reason_t rr = esp_reset_reason();
+  Serial.printf("[INFO] reset reason: %s (%d)\n", resetReasonName(rr), (int)rr);
   pinMode(PIN_LED, OUTPUT);
   analogSetPinAttenuation(PIN_MQ135, ADC_11db); // 0..~3.1 V range
   analogSetPinAttenuation(PIN_MQ136, ADC_11db);

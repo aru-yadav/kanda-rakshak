@@ -6,10 +6,12 @@
 // ============================================================================
 
 // ---- DHT22 (AM2302) temperature / humidity, powered from 3V3 ----
-#define PIN_DHT_TOP      4    // heap top layer
-#define PIN_DHT_MID      16   // heap middle layer
-#define PIN_DHT_BOT      17   // heap bottom layer
-#define PIN_DHT_AMB      18   // ambient, outside the heap, shaded
+// Pins match docs/hardware/wiring-poc.png. GPIO 25/27 are ADC2 but fine as digital.
+// GPIO 25/26 are also the DAC pins: do not enable the DAC on GPIO 25/26.
+#define PIN_DHT_TOP      32   // heap top layer
+#define PIN_DHT_MID      33   // heap middle layer
+#define PIN_DHT_BOT      25   // heap bottom layer
+#define PIN_DHT_AMB      27   // ambient, outside the heap, shaded
 
 // ---- MQ gas sensors, powered from 5 V, analog out via 10k/20k divider ----
 // ADC1 pins only (ADC2 is unusable while WiFi is on).
@@ -18,8 +20,9 @@
 #define MQ136_INSTALLED  true
 #define MQ_DIVIDER_RATIO 1.5f // Vsensor = Vpin * (10k+20k)/20k
 
-// ---- Fan via logic-level MOSFET module (D4184 / AO3400), NOT IRF520 ----
-#define PIN_FAN          25
+// ---- Fan via 5 V relay module (JQC-3F-T73), jumper on H: HIGH = fan ON ----
+// COM = 12 V+ through 1 A slow-blow fuse, NO = fan +. Boots LOW = relay open = fan OFF.
+#define PIN_FAN          26
 #define PIN_LED          2    // onboard LED
 
 // ---- Timing (demo values; field values in comments) ----
