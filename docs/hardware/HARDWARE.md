@@ -1,129 +1,165 @@
-# Hardware Build Guide — Kanda Rakshak PoC (v0.1)
+# Hardware: Kanda Rakshak
+
+Two builds:
+- **Part A — PoC (bench):** what we build and test now, ₹11,500.
+- **Part B — Field kit v2:** for a real 25 t chawl, ≈₹17,000–19,000 (≈₹700–750 per tonne). Designed, not built.
+
+All prices are **approximate, Nov 2026** (retail, Pune / online). Recheck when ordering.
 
 Owner: Sarvejeet. Reviewer: `hardware-safety-reviewer` agent + a second human before first power-on.
-Wiring diagram: `wiring.svg` / `wiring.png` in this folder. Pin truth source: `firmware/include/config.h` (must match §3).
+Pin truth: `firmware/include/config.h`. This file must match it.
 
-> **Safety first.** 12 V can't hurt you, but it can kill the ESP32 in one wrong jumper and can heat thin wires. Never connect or move wires with power on. Always measure the buck output before connecting anything to it.
-
----
-
-## 1. Bill of materials (1 kit)
-
-| # | Part | Qty | Approx ₹ | Notes |
-|---|---|---|---|---|
-| 1 | ESP32 DevKit V1 (ESP32-WROOM-32, 30 or 38 pin) | 1 | 450 | Check USB chip (CP2102 or CH340) and install its driver |
-| 2 | DHT22 / AM2302 **module** (3-pin, pull-up on board) | 4 | 920 | 3 in heap + 1 ambient. Module type has the 10 kΩ pull-up |
-| 3 | MQ-135 gas sensor module | 1 | 150 | VOC / NH₃ |
-| 4 | MQ-136 gas sensor module | 1 | 600 | H₂S / sulphur. Optional if unavailable (cut list item 1) |
-| 5 | Logic-level MOSFET module (D4184, AO3400, or IRLZ44N based) | 1 | 120 | **Not IRF520.** Must say "3.3 V compatible" |
-| 6 | 12 V DC fan, 80–120 mm, ≤ 0.3 A | 1 | 200 | 2-wire is fine |
-| 7 | Diode 1N5819 (or 1N4007) | 2 | 10 | Flyback across fan (if MOSFET module has none) |
-| 8 | 12 V 2 A DC adapter + female DC barrel jack with screw terminals | 1 | 250 | |
-| 9 | LM2596 buck converter module | 1 | 120 | Set to 5.0 V before use |
-| 10 | Resistors: 10 kΩ ×4, 20 kΩ ×2 | — | 20 | Voltage dividers for the MQ analog outputs |
-| 11 | Breadboard 830-point + jumper wires (M-M, M-F, 40 each) | 1 set | 250 | |
-| 12 | 3-core wire, 3 m (for probes) + heat-shrink | 1 | 150 | |
-| 13 | 20 mm PVC pipe, 1 m + end caps | 1 | 80 | Probe sticks: drill 4–5 holes near the sensor |
-| 14 | Small plastic enclosure (electronics) | 1 | 150 | Keep it above and outside the onion heap |
-| 15 | Ventilated plastic crates ×2 + 4 kg onions | — | 400 | Fresh crate + rot crate |
-| 16 | Multimeter (if you don't own one) | 1 | 400 | Mandatory |
-| | **Total** | | **≈ ₹4,200** | Field kit BOM (with solar + 4G) ≈ ₹7,600: see deck slide 4 |
+> **Safety first.** 12 V won't hurt you, but one wrong jumper can kill the ESP32, and thin wire carrying too much current gets hot. Never connect or move wires with the power on. Always measure the buck output before connecting anything to it.
 
 ---
 
-## 2. Power budget (check before buying the adapter)
+# Part A — PoC (bench build, ₹11,500)
+
+![PoC circuit](wiring-poc.png)
+
+`wiring-poc.png` (Cirkit Designer export, final PoC circuit, 5 Nov 2026).
+
+**What the diagram shows (checked against this file on 5 Nov 2026):** DHT22 DAT → GPIO 32 / 33 / 25 / 27 with VCC on 3V3; MQ-135 / MQ-136 AOUT → 12 kΩ → node → 10 kΩ → GND, nodes → GPIO 34 / 35; relay IN → GPIO 26, relay DC+ and MQ 5V from the LM2596 output rail, ESP32 fed on its 5V pin; COM fed from 12 V + through a fuse, NO → fan +; OLED SDA 21 / SCL 22 on 3V3; one common ground.
+
+**Where the diagram differs from this file (this file is the build truth):**
+- The 12 V source is drawn as a **battery**; on the bench we use the 12 V 2 A adapter. Wiring is the same.
+- **One fuse is drawn**, on the fan path (12 V + → relay COM), with no value. Fit **1 A slow-blow** there.
+- **Main 2 A fuse not drawn.** In the drawing the buck IN+ goes straight to 12 V +. Fit the 2 A fuse at adapter/battery + so it feeds everything, buck included.
+- **Flyback diode not drawn** (1N4007 / 1N5819 across the fan, stripe to fan +).
+- **10 kΩ pull-down on relay IN not drawn.**
+- Relay trigger jumper position is not shown; it must be on **H**.
+- The drawing does not label which DHT22 is TOP / MID / BOT / AMB. Use the pin map in §A4 and the B1 breath test.
+- Optional SCD41, BME688 and DS18B20 are not drawn.
+
+**Diagram TODO:** redraw with the 2 A main fuse, the 1 A value on the fan fuse, the flyback diode, the 10 kΩ pull-down, the jumper on H and the DHT position labels.
+
+## A1. Summary
+
+| Block | Connection |
+|---|---|
+| Controller | ESP32 DevKit V1 (ESP32-WROOM-32) |
+| 4 × DHT22 | DAT → **GPIO 32** (heap TOP), **33** (MID), **25** (BOT), **27** (AMBIENT). VCC → **3V3**, GND → GND |
+| MQ-135 / MQ-136 | VCC → 5 V rail. AOUT → **12 kΩ** → divider node → **10 kΩ** → GND. Divider node → **GPIO 34** (MQ-135) / **GPIO 35** (MQ-136). Max at pin: 5.0 V × 10/22 = **2.27 V** |
+| Fan relay | Relay module (JQC-3F-T73, 5 V coil, trigger jumper on **H**). IN ← **GPIO 26** (HIGH = fan ON), **10 kΩ pull-down IN → GND**. DC+ → 5 V rail, DC− → GND |
+| Fan path | 12 V + → **1 A slow-blow fuse** → relay **COM**; relay **NO** → fan +; fan − → 12 V −. **22 AWG** wire on this path. **Flyback diode 1N4007 (or 1N5819)** across the fan, stripe/cathode to fan + |
+| Power | 12 V adapter + → **main 2 A fuse** → everything (buck and fan path). LM2596 12 V → **5.0 V rail**, which feeds ESP32 5V/VIN, MQ heaters and the relay module |
+| OLED (SSD1306, I2C) | SDA → **GPIO 21**, SCL → **GPIO 22**, VCC → 3V3 |
+| Ground | **One common ground**: adapter −, buck −, ESP32 GND, sensors, relay DC− |
+| Optional | SCD41 (CO₂) + BME688 (VOC/sulphur) on the same I2C bus (21/22). DS18B20 string on **GPIO 4** with a **4.7 kΩ pull-up to 3V3** |
+
+> **Real build:** the main 2 A fuse moves to the **battery +** terminal, so the battery lead is protected too.
+
+## A2. Bill of materials (1 PoC kit)
+
+Budget: **₹11,500** = kit ₹7,910 + testing ₹3,590 (see `docs/PROJECT_INSTRUCTIONS.md`). Fill the per-line prices from the purchase receipts. Don't invent them.
+
+| # | Part | Qty | Notes |
+|---|---|---|---|
+| 1 | ESP32 DevKit V1 (ESP32-WROOM-32) | 1 | Check the USB chip (CP2102 / CH340) and install its driver |
+| 2 | DHT22 / AM2302 **module** (3-pin, pull-up on board) | 4 | 3 in the heap + 1 ambient |
+| 3 | MQ-135 gas sensor module | 1 | VOC / NH₃ |
+| 4 | MQ-136 gas sensor module | 1 | H₂S / sulphur (cut list item 1) |
+| 5 | 1-channel 5 V relay module (JQC-3F-T73, H/L jumper) | 1 | Jumper on **H**. Must pass bench test B9 at 3.3 V logic |
+| 6 | 12 V DC fan, 80–120 mm, ≤ 0.3 A | 1 | |
+| 7 | **Diode 1N4007 (or 1N5819)** | 1 | Flyback across the fan, stripe to fan + |
+| 8 | **Fuse 1 A slow-blow + inline holder** | 1 | Fan path, at relay COM |
+| 9 | **Fuse 2 A + inline holder** | 1 | Main fuse at adapter/battery +, feeds everything |
+| 10 | **22 AWG wire**, red + black, 2 m | 1 | 12 V fan path |
+| 11 | 12 V 2 A DC adapter + female barrel jack with screw terminals | 1 | |
+| 12 | LM2596 buck module | 1 | Set to 5.0 V **before** connecting anything |
+| 13 | Resistors: **12 kΩ ×2, 10 kΩ ×3** | — | MQ dividers (12k + 10k each) + **10 kΩ relay IN pull-down** |
+| 14 | 0.96" SSD1306 I2C OLED | 1 | Local status display |
+| 15 | Breadboard 830 + jumpers (M-M, M-F) | 1 set | Signal wiring only; the fan current goes on 22 AWG |
+| 16 | 3-core wire 3 m + heat-shrink, 20 mm PVC pipe + caps | — | Probe sticks |
+| 17 | Enclosure for the electronics | 1 | Closed: covers the relay's 12 V screw terminals |
+| 18 | Ventilated crates ×2 + 4 kg onions | — | Fresh crate + rot crate |
+| 19 | Multimeter | 1 | Mandatory |
+| opt | SCD41, BME688, DS18B20 string + 4.7 kΩ | — | Optional, toward the v2 sensors |
+
+## A3. Power budget
 
 | Load | Rail | Current |
 |---|---|---|
-| ESP32 with WiFi transmitting (peak) | 5 V (VIN) | ~250 mA |
-| MQ-135 heater (≤ 800 mW) | 5 V | ~160 mA |
-| MQ-136 heater (≤ 900 mW) | 5 V | ~180 mA |
-| DHT22 ×4 | 3.3 V (from ESP32) | ~6 mA |
-| **5 V rail total** | | **≈ 0.6 A** (LM2596 rated 3 A → OK) |
-| 12 V side for the buck (≈ 85 % efficient) | 12 V | ≈ 0.3 A |
+| ESP32, WiFi transmitting (peak) | 5 V | ~250 mA |
+| MQ-135 heater | 5 V | ~160 mA |
+| MQ-136 heater | 5 V | ~180 mA |
+| Relay coil | 5 V | ~75 mA |
+| DHT22 ×4 + OLED | 3.3 V (ESP32 regulator) | ~30 mA |
+| **5 V rail total** | | **≈ 0.7 A** (LM2596 rated 3 A → OK) |
+| Buck input at 12 V (≈ 85 % efficient) | 12 V | ≈ 0.35 A |
 | Fan | 12 V | ≤ 0.3 A |
-| **12 V total** | | **≈ 0.6 A** (2 A adapter → 3× headroom) |
+| **12 V total** | | **≈ 0.65 A** → main 2 A fuse, 2 A adapter |
 
----
+## A4. Pin map (must match `firmware/include/config.h`)
 
-## 3. Pin map (single source of truth = `firmware/include/config.h`)
+| Function | Part pin | ESP32 pin | Why this pin |
+|---|---|---|---|
+| Heap TOP temp/RH | DHT22 #1 DAT | **GPIO 32** | General GPIO, no strapping role |
+| Heap MIDDLE temp/RH | DHT22 #2 DAT | **GPIO 33** | General GPIO |
+| Heap BOTTOM temp/RH | DHT22 #3 DAT | **GPIO 25** | Digital use only (ADC2 is fine as digital with WiFi on) |
+| AMBIENT temp/RH | DHT22 #4 DAT | **GPIO 27** | Digital use only (ADC2) |
+| VOC gas | MQ-135 AOUT → divider | **GPIO 34** (ADC1) | ADC1 works with WiFi on; input-only |
+| Sulphur gas | MQ-136 AOUT → divider | **GPIO 35** (ADC1) | ADC1, input-only |
+| Fan relay | Relay IN | **GPIO 26** | Not a strapping pin, no boot output. 10 kΩ pull-down keeps the fan OFF during boot |
+| OLED / I2C | SDA / SCL | **GPIO 21 / 22** | Default I2C pins |
+| DS18B20 (optional) | DQ | **GPIO 4** | 4.7 kΩ pull-up to 3V3 |
+| Status LED | Onboard | **GPIO 2** | Built in |
 
-| Function | Part pin | → | ESP32 pin | Why this pin |
-|---|---|---|---|---|
-| Heap TOP temp/RH | DHT22 #1 OUT | → | **GPIO 4** | general GPIO, not strapping-critical for input |
-| Heap MIDDLE temp/RH | DHT22 #2 OUT | → | **GPIO 16** | free on WROOM-32 |
-| Heap BOTTOM temp/RH | DHT22 #3 OUT | → | **GPIO 17** | free on WROOM-32 |
-| AMBIENT (outside) | DHT22 #4 OUT | → | **GPIO 18** | free |
-| VOC gas | MQ-135 AO → divider | → | **GPIO 34** (ADC1_CH6) | ADC1 works with WiFi on; input-only pin |
-| Sulphur gas | MQ-136 AO → divider | → | **GPIO 35** (ADC1_CH7) | ADC1, input-only |
-| Fan switch | MOSFET module SIG/IN | → | **GPIO 25** | output, PWM-capable |
-| Status LED | onboard LED | — | **GPIO 2** | built in |
-| DHT22 power | VCC / GND | → | **3V3 / GND** | keeps data line at 3.3 V |
-| MQ power | VCC / GND | → | **5 V rail / GND** | heaters need 5 V |
-| ESP32 power | VIN / GND | ← | **5 V rail / GND** | from the buck |
+**Do not use:** GPIO 0, 2 (except the LED), 5, 12, 15 (boot strapping), GPIO 6–11 (flash), or ADC2 pins for **analog** while WiFi is on.
 
-**Do not use:** GPIO 0, 2 (except LED), 5, 12, 15 (boot strapping), GPIO 6–11 (flash), ADC2 pins (GPIO 0, 2, 4*, 12–15, 25–27) for analog while WiFi is on. (*GPIO 4 is fine as a digital DHT pin.)
-
-### Voltage divider for each MQ analog output
-MQ modules powered at 5 V can output up to 5 V. ESP32 GPIO max is 3.3 V.
+### MQ voltage divider
 ```
-MQ AO ──[10 kΩ]──┬──> ESP32 GPIO34 (or 35)
-                 │
-              [20 kΩ]
-                 │
-                GND
-Vout = Vin × 20/(10+20) = 0.667 × Vin  → 5.0 V becomes 3.33 V
+MQ AOUT ──[12 kΩ]──┬──> ESP32 GPIO 34 (or 35)
+                   │
+                [10 kΩ]
+                   │
+                  GND
+Vpin = Vout × 10/(12+10) = 0.455 × Vout  → 5.0 V becomes 2.27 V
 ```
-The firmware multiplies back by 1.5 (`MQ_DIVIDER_RATIO`) to report the sensor's real output voltage.
+The firmware multiplies by `MQ_DIVIDER_RATIO = 2.2` ((12k + 10k) / 10k) to report the sensor's real output voltage.
 
----
-
-## 4. Build order (test each block before adding the next)
+## A5. Build order (test each block before adding the next)
 
 ### Step A — ESP32 alone (USB power only)
-1. Plug ESP32 into the laptop by USB. `cd firmware && pio run -t upload && pio device monitor`.
-2. You should see the boot banner and `[WARN] DHT top: NaN` lines (no sensors yet). Onboard LED blinks.
+1. `cd firmware && pio run -t upload && pio device monitor`.
+2. You should see the boot banner and `[WARN] DHT top: NaN` (no sensors yet). The onboard LED blinks.
 
 ### Step B — Power rail (ESP32 NOT connected)
-1. 12 V adapter → barrel jack → buck IN+ / IN−.
-2. Multimeter on buck OUT. Turn the brass screw until it reads **5.00–5.05 V**. Mark the screw with a pen.
-3. Power off. Run buck OUT+ to breadboard **red rail (5 V)**, OUT− to **blue rail (GND)**.
-4. Run a second wire from 12 V − (adapter ground) to the same GND rail. **All grounds common.**
+1. 12 V adapter + → **2 A fuse** → barrel jack → buck IN+. Adapter − → buck IN−.
+2. Multimeter on buck OUT. Turn the screw until it reads **5.00–5.05 V**, then mark the screw.
+3. Power off. Buck OUT+ → **5 V rail**, OUT− → **GND rail**. Adapter − also to the GND rail. **All grounds common.**
 
 ### Step C — DHT22 ×4 (USB power is enough)
-1. Each DHT22 module: `+` → ESP32 **3V3**, `−` → **GND**, `OUT` → its GPIO (§3).
+1. Each module: `+` → **3V3**, `−` → **GND**, `DAT` → GPIO 32 / 33 / 25 / 27 (§A4).
 2. Label each sensor with tape: TOP, MID, BOT, AMB.
-3. Upload, open serial: all four show sensible values (e.g. 26.4 °C, 61 %). Breathe on one: its RH jumps. That proves the label → pin mapping.
+3. Breathe on one: only its RH jumps. That proves the label → pin mapping (test B1).
 
 ### Step D — MQ sensors (needs the 5 V rail)
-1. Power off. MQ VCC → **5 V rail**, GND → **GND rail**, AO → **10 kΩ** → divider node → **20 kΩ** → GND; divider node → GPIO 34 (MQ-135) / GPIO 35 (MQ-136). Leave DO unconnected.
-2. Before connecting the ESP32 pin, measure the divider node with the multimeter: it must stay **below 3.3 V**.
-3. ESP32 VIN → **5 V rail**, ESP32 GND → **GND rail**. Unplug USB while the external supply is on unless your board has a protection diode (most DevKit V1 boards do; still, avoid both together).
-4. **Burn-in:** new MQ sensors need **24–48 h** powered on before readings stabilise. Start this on Day 4 night and leave it running. Firmware also ignores gas for the first `MQ_WARMUP_MS` after every boot.
-5. Test: hold a cut onion near the sensor → gas mV rises within a minute.
+1. Power off. MQ VCC → **5 V rail**, GND → **GND**, AOUT → **12 kΩ** → node → **10 kΩ** → GND. Leave DOUT unconnected.
+2. **Before** connecting the node to the ESP32, measure it: it must stay **below 2.5 V** (expected max 2.27 V).
+3. Node → GPIO 34 (MQ-135) / GPIO 35 (MQ-136). ESP32 GND → GND rail.
+4. **USB and the rail must never feed the ESP32 5V pin at the same time.** For any test that uses the serial monitor (Steps C–E, bench tests B1–B10): leave the ESP32 **5V pin disconnected from the rail** and power the ESP32 from USB. The rail still feeds the MQ heaters and the relay, and the grounds stay common. Connect ESP32 5V → rail only for standalone runs with USB unplugged.
+5. **Burn-in:** new MQ sensors need 24–48 h powered before readings settle. The firmware also ignores gas for `MQ_WARMUP_MS` after every boot.
 
-### Step E — Fan via MOSFET
-1. Power off. Typical D4184/AO3400 module terminals: **VIN+ / VIN−** (supply in), **OUT+ / OUT−** (load), **TRIG/PWM + GND** (signal). Wire: VIN+ → **12 V +**, VIN− → **GND**; fan red (+) → **OUT+**, fan black (−) → **OUT−**; TRIG/PWM → **GPIO 25**; signal GND → **GND rail**. (It is a low-side switch: OUT− is the MOSFET drain.) Check your module's silkscreen; if labels differ, ask before powering.
-2. Flyback diode across the fan: **stripe (cathode) to fan +**, other end to fan −. Skip if the module has one built in (check the board for a diode near the output).
-3. Power on. In serial monitor type `fan on` / `fan off` / `fan auto`. Fan follows.
-4. Touch the MOSFET after 2 minutes ON: it should be cool. If hot, it is not logic-level → replace.
+### Step E — Fan via relay
+1. Power off. Relay module: DC+ → **5 V rail**, DC− → **GND**, IN → **GPIO 26**, **10 kΩ from IN to GND**. Trigger jumper on **H**.
+2. Fan path on **22 AWG**: 12 V + (after the main fuse) → **1 A slow-blow fuse** → relay **COM**; relay **NO** → fan red (+); fan black (−) → 12 V −. Leave NC unconnected.
+3. **Flyback diode** at the fan: 1N4007 (or 1N5819), **stripe/cathode to fan +**, other end to fan −.
+4. Power on. The fan must stay **OFF** through boot and reset (test B10).
+5. In the serial monitor type `fan on` / `fan off` / `fan auto`. The relay clicks and the fan follows. If the relay doesn't switch reliably at 3.3 V logic, see test B9.
 
 ### Step F — WiFi + backend
-1. Fill `firmware/include/secrets.h`: WiFi SSID/password, `API_BASE` = `http://<laptop-LAN-IP>:8000`, device id `KR-01`, token = `DEVICE_TOKEN` from `backend/.env`.
-2. Laptop and ESP32 on the same WiFi / phone hotspot. Find the laptop IP: `ipconfig getifaddr en0` (Mac) / `ipconfig` (Windows) / `hostname -I` (Linux).
-3. Serial shows `[HTTP] 200` every cycle; dashboard shows KR-01 live.
+1. Fill `firmware/include/secrets.h`: WiFi, `API_BASE` = `http://<laptop-LAN-IP>:8000`, device id `KR-01`, token = `DEVICE_TOKEN` from `backend/.env`.
+2. Laptop and ESP32 on the same WiFi. The serial monitor shows `[HTTP] 200` every cycle, and the dashboard shows KR-01 live.
 
----
-
-## 5. Mini-chawl assembly (Day 5)
+## A6. Mini-chawl assembly
 
 ```
-                 ┌──────────── ELECTRONICS BOX (outside, above crate) ───────────┐
-                 │  ESP32  buck  MOSFET  breadboard     ← 12 V adapter cable    │
-                 └───┬───────┬───────┬───────────┬──────────────────────────────┘
-       AMB DHT22 ●   │       │       │           │ fan cable
-  (outside, shaded)  │ probe │ gas   │           │
-                     │ stick │ pod   │           ▼
+                 ┌──────────── ELECTRONICS BOX (closed, outside, above crate) ──────┐
+                 │  ESP32  buck  relay  fuses  OLED        ← 12 V adapter cable      │
+                 └───┬───────┬───────┬───────────┬──────────────────────────────────┘
+       AMB DHT22 ●   │ probe │ gas   │           │ fan cable (22 AWG)
+  (outside, shaded)  │ stick │ pod   │           ▼
           ┌──────────┼───────┼───────┼─────┐  ┌──────┐
           │  GAS POD ●(MQ-135/136, top, ───┼──│ FAN  │ blows outside air
           │          │  away from fan)     │  │ 12 V │ through the slats
@@ -132,41 +168,94 @@ The firmware multiplies back by 1.5 (`MQ_DIVIDER_RATIO`) to report the sensor's 
           │   ●BOT DHT22  ← 5 cm above floor│   ONION CRATE (ventilated)
           └─────────────────────────────────┘
 ```
-- Probe stick: PVC pipe with the 3 DHT22s fixed inside at 3 heights, holes drilled next to each sensor, pushed vertically into the onions.
-- Gas pod on top of the heap (gases rise), shielded from direct fan airflow, or it will just read fresh air.
+- Gas pod on top of the heap (the gases rise), shielded from the fan airflow.
 - Ambient DHT22 outside the crate, in shade, not in the fan's exhaust.
-- Electronics box is never inside the onion heap (moisture, and onion skins are flammable).
-- Two crates (fresh vs rot) must be in the same room, same conditions.
+- The electronics box never goes inside the heap (moisture, and onion skins burn).
 
----
-
-## 6. Connecting code to hardware (what happens where)
+## A7. Code ↔ hardware
 
 | Event | Where | Code |
 |---|---|---|
 | Read 4 × DHT22 every 30 s | ESP32 | `firmware/src/main.cpp` → `readDhtAll()` |
-| Read MQ mV (32-sample average, ×1.5 divider correction) | ESP32 | `readGasMv()` |
-| Decide fan ON/OFF (works offline) | ESP32 | `decideFan()`: heap RH vs ambient RH, heap T vs ambient T, hysteresis + min on/off times |
-| Send JSON | ESP32 → backend | `postReading()` → `POST /api/v1/readings` with `X-Device-Token` |
-| Buffer if offline, flush later | ESP32 | ring buffer `queue[]`, `QUEUE_LEN` |
-| Rot-risk score 0–100 | backend | `backend/app/rotrisk.py` |
-| Mandi price (cached daily) | backend | `backend/app/price.py` |
-| Hold / Sort / Sell text in Marathi + English | backend | `backend/app/advisory.py` |
-| Telegram text + voice | backend | `backend/app/notify.py` |
-| Live view | browser | `dashboard/index.html` |
-| Fan override from dashboard (optional) | backend → ESP32 | returned in the POST response as `fan_override` with TTL |
+| Read MQ mV (×`MQ_DIVIDER_RATIO`) | ESP32 | `readGasMv()` |
+| Fan ON/OFF, offline | ESP32 | `decideFan()` → GPIO 26 HIGH/LOW |
+| Send JSON / buffer offline | ESP32 → backend | `postReading()`, ring buffer `queue[]` |
+| Rot-risk, price, advice, notify | backend | `rotrisk.py`, `price.py`, `advisory.py`, `notify.py` |
 
----
-
-## 7. Common faults
+## A8. Common faults
 
 | Symptom | Likely cause | Fix |
 |---|---|---|
-| ESP32 not detected on USB | charge-only cable / missing driver | data cable; install CP210x or CH340 driver |
-| Upload fails "Failed to connect" | board not in boot mode | hold **BOOT**, tap **EN**, release BOOT when "Connecting…" shows |
-| DHT reads NaN | wrong pin / no pull-up / loose jumper | check §3; module type has pull-up; DHT22 needs ≥ 2 s between reads |
-| Gas always 0 | pin on ADC2 or divider open | use GPIO 34/35; measure divider node |
-| Gas stuck near max | divider missing (5 V into ADC) | **power off immediately**, add divider; ESP32 may be damaged |
-| ESP32 resets when fan starts | brown-out from shared supply | ESP32 on buck 5 V, fan on 12 V; add 470–1000 µF capacitor across 5 V rail |
-| MOSFET hot | not logic-level (IRF520) | replace with D4184/AO3400 module |
-| Dashboard shows nothing | wrong `API_BASE` IP or different WiFi | check laptop IP; same network; firewall allows port 8000 |
+| ESP32 not detected | Charge-only cable / missing driver | Use a data cable; install the CP210x / CH340 driver |
+| DHT reads NaN | Wrong pin / loose jumper | Check §A4; wait ≥ 2 s between reads |
+| Gas always 0 | Divider open | Measure the divider node |
+| Gas node > 2.5 V | Resistors swapped (10k on top) | **Power off**, fit 12k on top, 10k to GND |
+| Fan clicks on at boot | Pull-down missing | Fit 10 kΩ from IN to GND |
+| Relay won't switch from GPIO | Module needs > 3.3 V logic | See B9: transistor driver or a 3.3 V-trigger module |
+| ESP32 resets when the fan starts | Brown-out / no flyback diode | Check the diode; add 470–1000 µF across the 5 V rail |
+| Fuse blows | Short on the fan path / fan stalled | Find the fault. Never upsize the fuse |
+
+---
+
+# Part B — Field kit v2 (25 t chawl, ≈₹17,000–19,000 (≈₹700–750 per tonne))
+
+Status: **designed, not built.** Prices approximate, Nov 2026.
+
+| Block | Part | Notes |
+|---|---|---|
+| Controller | ESP32-C3 or ESP32-S3 | See the pin note below |
+| Heap temp/RH | **4 × SHT40** with **PTFE membrane caps**, via **TCA9548A** I2C mux | The SHT40s share one I2C address, so the mux gives each its own channel. PTFE keeps dust and condensation off the sensor |
+| Heap core temperature | **DS18B20 string** (one-wire, 4.7 kΩ pull-up) | Several probes down the heap for heat spots (ΔT) |
+| CO₂ | **SCD41** (I2C) | Respiration rise during fan-off windows |
+| Sulphur / VOC | **BME688** (I2C) | Tells rot from sprouting. **MQ-136** is the alternative where there is grid power (heater draw) |
+| Fans | **2–3 × 300 mm 12/24 V DC BLDC** fans blowing into an **under-floor plenum** | Switched by logic-level MOSFET / DC SSR on two outputs. Sizing target 1–2 m³/min of air per m³ of onions (see EVIDENCE.md) |
+| Network | **A7670C** 4G/2G modem on UART2 | **Its own 4 V / 2 A buck** (2 A transmit bursts); never powered from the 3.3 V or 5 V logic rail |
+| Power | Fans: **grid → 12/24 V DC supply** (no mains in the shed); **10–20 W solar** + battery for the electronics | Through a power cut, the electronics keep sensing, logging and deciding. The **fans can't run** until the grid returns. Main fuse at **battery +** |
+
+### Field kit BOM (25 t chawl, approximate, Nov 2026)
+
+| Item | ≈ ₹ |
+|---|---|
+| ESP32-C3/S3 board | 300 |
+| SCD41 CO₂ sensor | 2,100 |
+| 4 × SHT40 + PTFE caps | 1,400 |
+| 8 × DS18B20 string | 700 |
+| Probe tubes | 400 |
+| A7670C 4G modem | 1,700 |
+| Electronics solar + LiFePO₄ | 2,500 |
+| SSR / MOSFET switching | 800 |
+| 2–3 × 300 mm 12/24 V DC BLDC fans | 6,000 |
+| IP65 box, PCB, surge protection | 1,500 |
+| BME688 sulphur/VOC sensor (alternative: MQ-136 ≈ ₹600 on grid power) | 1,200 |
+| TCA9548A I2C mux | 150 |
+| **Total** | **≈ 18,750** → quoted as ≈₹17,000–19,000 (≈₹700–750 per tonne) |
+
+### Pilot budget (40 kit + 20 control chawls)
+
+| Item | ₹ lakh |
+|---|---|
+| 40 kits × ₹17,000 (as presented on the deck) | 6.80 |
+| Install + training | 0.30 |
+| SIM / IVR / cloud, 8 months | 0.45 |
+| Weigh-in / weigh-out audit, 60 chawls | 0.45 |
+| Spares | 0.25 |
+| Subtotal | 8.25 |
+| GST 18 % | 1.49 |
+| **Total** | **9.74** (quoted as ₹9.7 lakh) |
+
+The itemised BOM came out at ≈ ₹18,750 per kit, above the ₹17,000 used here. The pilot keeps **40 kits**; an FPO/farmer **co-pay of ≈ ₹1,750 per kit** (≈ ₹0.7 lakh total) covers the gap. Backup: **36 kits** without co-pay (see EVIDENCE.md).
+
+**Fan voltage (decided 5 Nov 2026): 12/24 V DC BLDC fans by default.** They run from the grid through a DC power supply, so no mains wiring goes into the damp shed (same reasoning as v1, see TECH_STACK.md). Switch them with a logic-level MOSFET or DC SSR, with a fuse per fan line.
+**230 V AC fans: option only** for FPO stores that already have wiring. Only with a 30 mA RCD/RCCB, a proper earth, a correctly rated SSR with its own fuse, an IP65 enclosure for every mains part, no mains wiring inside the heap, and installation by a licensed electrician. Either way, the install must pass `hardware-safety-reviewer` and a human check first.
+
+**Pin note (do not wire from this yet).** The v2 design was sketched on classic-ESP32 numbering: fan outputs **GPIO 26 / 19**, modem **UART2 TX/RX GPIO 17 / 16**. These numbers don't carry over to C3/S3. On most S3 modules GPIO 26 is flash/PSRAM and GPIO 19 is USB D−. On the C3, GPIO 16/17 are flash pins. Make a final pin map for the chosen chip, pass it through `hardware-safety-reviewer`, and put it in `config.h` before any PCB or wiring.
+
+### Cost scaling (approximate, Nov 2026)
+
+| Chawl size | Kit cost | Per tonne |
+|---|---|---|
+| 5 t | ≈ ₹9–10k | ≈ ₹1,800–2,000/t |
+| **25 t** | **≈ ₹17–19k (itemised ≈ ₹18,750)** | **≈ ₹700–750/t** |
+| 100 t | ≈ ₹45–65k | ≈ ₹450–650/t |
+
+Fans and plenum scale with tonnage; the controller, sensors and modem cost about the same at any size.

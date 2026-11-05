@@ -77,11 +77,11 @@ Use agents explicitly when needed: "use the firmware-engineer agent to …", "/r
 ### Day 4 — Fri 23 Oct — **Gate G2: hardware on the bench**
 | Who | Task |
 |---|---|
-| S | Wire step by step (HARDWARE.md §4), test each block alone with `pio run -t upload` and serial monitor: DHT22 ×4 → MQ-135/136 (start the 24–48 h burn-in tonight, leave powered) → MOSFET + fan. |
+| S | Wire step by step (HARDWARE.md §A5), test each block alone with `pio run -t upload` and serial monitor: DHT22 ×4 → MQ-135/136 (start the 24–48 h burn-in tonight, leave powered) → relay + fan. |
 | S | Flip `FAN_TEST` in serial: fan on/off from command. |
 | A | Pair with S on firmware: WiFi + POST to backend on the laptop's LAN IP. |
 
-**G2 exit:** all 4 DHT22 valid on serial · both MQ readings change when you breathe on / bring a cut onion near them · fan switches via MOSFET · `hardware-safety-reviewer` PASS · device posts to backend.
+**G2 exit:** all 4 DHT22 valid on serial · both MQ readings change when you breathe on / bring a cut onion near them · fan switches via relay (B9 + B10 pass) · `hardware-safety-reviewer` PASS · device posts to backend.
 
 ### Day 5–6 — Sat 24 – Sun 25 Oct — **Gate G3: real end-to-end loop**
 | Who | Task |
@@ -127,3 +127,38 @@ Follow docs/DEMO_SCRIPT.md. Charge everything, cache price, pre-send test messag
 - Week 3–4: 2 real chawls at a Lasalgaon/Niphad FPO, weigh-in baseline.
 - IVR/SMS through a DLT-registered provider; Bhashini for Marathi TTS.
 - Calibrate gas thresholds with NHRDF/KVK on local varieties.
+
+---
+
+## 4. v2 roadmap (field kit, after Round 2)
+
+Same rule as v1: finish one loop before the next feature. Hardware: `docs/hardware/HARDWARE.md` → Field kit v2. Business case: `docs/BUSINESS.md`.
+
+### 4.1 Device (firmware)
+| # | Item | Done when |
+|---|---|---|
+| D1 | **Dew-point fan rule with condensation guard.** Ventilate only when outside dew point is below heap surface temperature by a margin, so the fan never wets the onions. | Shared test vectors (one JSON file) pass in both firmware unit tests and the digital twin |
+| D2 | Drivers: SHT40 ×4 via TCA9548A, DS18B20 string, SCD41 CO₂, BME688 sulphur/VOC | Each sensor reads valid values on serial; missing sensor reports `null`, never a fake number |
+| D3 | **Payload v2, backward compatible.** New optional fields; v1 devices keep working | Backend accepts v1 and v2 payloads; tests for both |
+| D4 | Device health alerts (sensor dead, stuck value, low power, offline) + OTA updates | Alert reaches the farmer/FPO as "check device"; OTA tested with a rollback |
+
+### 4.2 Decision (backend)
+| # | Item | Done when |
+|---|---|---|
+| B1 | **Rot-risk v2:** heap ΔT (heap vs ambient), CO₂ rise rate measured only in fan-off windows, hours above 80 % RH; sulphur signal confirms rot vs sprouting | Every rule has a pytest; `/explain` shows each component; still labelled *rule-based* |
+| B2 | Weather-forecast fan scheduling (run fans in the driest/coolest hours) | Forecast is advisory only; the on-device rule still decides offline |
+| B3 | Agmarknet arrivals early warning (arrival surge → price drop risk) | Uses real arrivals data with source + date on every number |
+
+### 4.3 Farmer channel
+| # | Item | Done when |
+|---|---|---|
+| F1 | Curing advice (before loading) and loading advice (heap height, airflow) in Marathi | Fixed templates, reviewed by a native speaker |
+| F2 | Pre-recorded IVR audio for keypad phones | Human-recorded Marathi clips, no TTS for farmer messages |
+
+### 4.4 Pilot tooling (40 kit + 20 control chawls)
+| # | Item | Done when |
+|---|---|---|
+| P1 | Weigh-in / weigh-out forms, chawl registry, kit vs control assignment | Loss % computed only from weighed stock |
+| P2 | FPO dashboard for the pilot | Kit and control chawls shown side by side; no simulated data mixed in |
+
+Pilot claim stays a **target** until P1 data exists.

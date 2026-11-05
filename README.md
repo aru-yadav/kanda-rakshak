@@ -6,10 +6,12 @@
 
 <img src="docs/awards/innovatex-2026-1st-prize.jpg" alt="InnovateX 2.0 1st Prize certificates for Kanda Rakshak" width="360">
 
+**Seva First 2026:** shortlisted for virtual jury, Nov 2026
+
 
 **Seva First Innovation Challenge 2026 (Maharashtra)** · Sector 1 Agriculture · Sub-theme 5: Post-Harvest Loss, Storage and Price Protection
 
-A low-cost (≈₹7,900, BOM in progress) retrofit kit that turns a farmer's existing onion shed (kanda chawl) into a smart store:
+A low-cost retrofit kit (field kit ≈₹700–750 per tonne of storage) that turns a farmer's existing onion shed (kanda chawl) into a smart store:
 
 - **Watches** heat, humidity and rot gas at the top, middle and bottom of the onion heap
 - **Acts** on its own: switches ventilation fans on when outside air is drier, even with no network
@@ -17,17 +19,25 @@ A low-cost (≈₹7,900, BOM in progress) retrofit kit that turns a farmer's exi
 
 > Demo video: `<paste YouTube link>`
 
+## At a glance
+
+| | |
+|---|---|
+| PoC bench build | ₹11,500 |
+| Field kit v2 | ≈₹17,000–19,000 (≈₹700–750 per tonne) for a 25 t chawl, approximate, Nov 2026 |
+| Pilot (proposed) | 40 kit chawls + 20 control chawls |
+
 ## Status (honest)
 
 | Part | Status |
 |---|---|
-| Backend (FastAPI), rule-based rot-risk score, Marathi advisory, `/explain` decision trace | ✅ Built, 67 automated tests passing |
+| Backend (FastAPI), rule-based rot-risk score, Marathi advisory, `/explain` decision trace | ✅ Built, 79 automated tests passing |
 | Live mandi price (data.gov.in Agmarknet) | ✅ Integrated, with cache and fallback labels |
 | Farmer app, shed dashboard, department/FPO dashboard | ✅ Built |
 | Digital twin: 8 simulated sheds around Nashik | ✅ Running. Heap model with assumed coefficients; fan rule modelled on the firmware (not yet verified against it) |
 | SMS / voice call for keypad phones | 📅 Planned (demo uses Telegram) |
-| ESP32 firmware + hardware (DHT22 ×4, MQ-135/136, solar fan) | 🔧 Firmware written (compile pending), hardware being assembled |
-| Field pilot (80 sheds, Niphad–Lasalgaon) | 📅 Proposed |
+| ESP32 firmware + hardware (DHT22 ×4, MQ-135/136, solar fan) | 🔧 Firmware written, `pio run` passes (PR #2), hardware being assembled |
+| Field pilot (40 kit + 20 control chawls, Niphad–Lasalgaon) | 📅 Proposed |
 
 All demo data comes from the digital twin and is labelled **SIMULATED** in the UI. Twin results (e.g. kit ON vs OFF) come from a model with assumed numbers, not from measurements.
 
@@ -62,7 +72,9 @@ Run the tests with `cd backend && source .venv/bin/activate && pytest`.
  Farmer app · Shed dashboard · Department / FPO dashboard
 ```
 
-- Hardware build: `docs/hardware/HARDWARE.md`, wiring in `docs/hardware/wiring.svg`
+- Hardware build: `docs/hardware/HARDWARE.md` (PoC + field kit v2), PoC circuit in [`docs/hardware/wiring-poc.png`](docs/hardware/wiring-poc.png)
+- Pitch decks and explainer: [`docs/pitch/`](docs/pitch/)
+- Business model: `docs/BUSINESS.md` · evidence register: `docs/EVIDENCE.md`
 - Full plan: `docs/PLAN.md`
 - Software demo details: `docs/SOFTWARE_DEMO.md`
 - 3D working model: `docs/simulation/kanda-rakshak-3d.html` (open it in a browser)
