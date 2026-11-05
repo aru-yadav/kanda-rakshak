@@ -2,6 +2,8 @@
 
 Read this twice before the pitch. Part A is the story. Part B covers every technical question the jury can ask, with the honest answer.
 
+**Award:** 1st Prize, InnovateX 2.0 Inter-College Project Competition, IEEE EMBS Pune Chapter × MIT-ADT University (30 Oct 2026).
+
 ---
 
 ## Part A. The story
@@ -34,9 +36,10 @@ The farmer also doesn't know when to sell. If he sells too early he gets a low p
 | Farmer phone app, shed dashboard, department/FPO dashboard | **Built** |
 | Messages to the farmer's phone | **Telegram working in demo; SMS and voice call planned (production)** |
 | Digital twin: 8 virtual sheds around Nashik | **Running**. Fan rule modelled on our firmware fan rule (not yet verified against it); heap behaviour uses assumed values, to be calibrated in the pilot |
-| ESP32 firmware (sensors, fan control, offline buffer) | **Written, compile pending**; hardware being assembled |
-| Hardware kit | **Designed**, parts list and wiring done |
-| Field pilot | **Proposed**: 80 sheds, Niphad–Lasalgaon |
+| ESP32 firmware (sensors, fan control, offline buffer) | **Written and compiles** (`pio run`); not yet run on the assembled hardware. Runs the **v1** fan rule |
+| PoC hardware (bench) | **Final circuit drawn** (`docs/hardware/wiring-poc.png`), budget **₹11,500**; being assembled |
+| Field kit v2 (25 t chawl) | **Designed, not built**: ≈₹17,000 incl. fans ≈ **₹700 per tonne** |
+| Field pilot | **Proposed**: 40 kit chawls + 20 control chawls, Niphad–Lasalgaon, budget **₹9.7 lakh** |
 
 **Why a digital twin?** "Rot takes weeks to happen in a real shed. We built a simple model of an onion heap so we could test every situation (humid monsoon, rot starting, network cut) in minutes. Its fan rule is modelled on our firmware fan rule (not yet verified against it), and the heap behaviour uses assumed values that we will calibrate in the pilot. When the hardware is installed, the same software takes real readings with zero changes. The device sends exactly the same data format."
 
@@ -48,7 +51,7 @@ The farmer also doesn't know when to sell. If he sells too early he gets a low p
 
 ```
 Shed: 3 temp/humidity sensors in the heap + 1 outside + 2 gas sensors
-   │  every 5 minutes
+   │  every 30 s in the demo, every 15 min in the field
    ▼
 ESP32 controller ── decides fan ON/OFF itself (works with no network)
    │  sends a small JSON message over the internet (HTTPS)
@@ -85,7 +88,7 @@ Our server (FastAPI, Python) ── stores the reading (SQLite database)
 - **Production:**
   - **SMS** through a licensed SMS provider. In India, business SMS must be registered on TRAI's **DLT** system with approved templates. Our messages are fixed templates, so this fits.
   - **Voice call (IVR)** through a calling provider, playing the Marathi message. This works for farmers who can't read.
-- **When:** only when the advice **changes** and the new state holds for 3 readings in a row (about 15 minutes). This stops the farmer getting a flood of messages when a reading flickers.
+- **When:** only when the advice **changes** and the new state holds for 3 readings in a row (about 45 minutes at the 15-minute field interval). This stops the farmer getting a flood of messages when a reading flickers.
 - **Why SMS and voice and not an app:** most small farmers have basic keypad phones or unreliable mobile data. SMS and voice calls work on 2G with no internet data.
 
 ### 4. Which language model do you use for Marathi translation?
@@ -134,18 +137,24 @@ The weights and thresholds are our starting values, to be **calibrated in the pi
 - Rotting onion releases **sulphur compounds** (the bad smell) and other gases such as ammonia.
 - **MQ-136** reacts to sulphur gases (H₂S). **MQ-135** reacts to ammonia and similar gases.
 - Cheap gas sensors are not lab-accurate, so we don't trust their absolute number. When the shed is loaded with fresh onion we record a **baseline**, and then we watch for a **rise above that baseline**. A 60% rise counts as full rot signal. This works even with low-cost sensors.
+- **v2 field kit: rot vs sprouting.** A rising CO₂ level alone can mean rot *or* sprouting, since both make onions breathe harder. So v2 combines two signals: **CO₂** (SCD41, measured while the fan is off) shows the heap is breathing harder, and **sulphur** (BME688, or MQ-136 where there is grid power for its heater) confirms that it is rot. This is **designed, not built**.
+- **Evidence that gas sensing can work:** lab studies only. A gas-sensor array told sour-skin-infected from healthy onions (University of Georgia, *Sensors*, 2015), and GC-IMS volatile profiles separated rotting from healthy stored onions (University of Warwick, *J. Agric. Food Chem.*, 2024). **These are lab results, not field results, and not ours.**
 
 ### 8. Why fans? Why not run them all the time?
 
 - The pile makes its own heat and moisture. Moving air through it carries both away. This is the single most effective thing a farmer can do, but today it's done by guesswork.
 - **The fan only helps if the outside air is drier than the air in the pile.** On a humid monsoon night, running the fan *pushes wet air in* and makes things worse.
 
-**Our rule, which runs on the device:**
+**Our rule (v1, the one running in the demo), which runs on the device:**
 - **Turn ON** when the pile humidity is above 78% *and* outside is at least 5 points drier, or when the pile is above 30 °C *and* outside is at least 1.5 °C cooler.
 - **Turn OFF** when the pile is dry enough (below 72%) or outside is no longer drier.
-- The fan must stay in a state for at least 30 minutes before switching, so it doesn't flicker.
+- The fan must stay in a state for a minimum time before switching (2 min in the demo, 15 min in the field), so it doesn't flicker.
 
-Fans are small **12 V DC** fans that can run on a **solar panel and battery**, so there's no extra electricity bill.
+**v2 (planned, not in the demo): dew-point rule.** The fan runs only when the outside air's dew point is safely below the onion surface temperature. This **condensation guard** means the fan never wets the onions. The firmware and the digital twin will share one set of test vectors for this rule.
+
+- **PoC:** one small **12 V DC** fan, switched by a relay.
+- **Field kit v2:** 2–3 × 300 mm fans blowing into an under-floor plenum, run on **grid** power. A **10–20 W solar** panel powers the electronics, so sensing and the fan rule keep working through power cuts.
+- **Why fans work (not our result):** NHRDF's fan-ventilated store at Sinnar lost **14.52 %** vs **33.40 %** in conventional storage over 6 months (*Vegetable Science* 47(2), 2020). Our kit adds automatic control and price-linked advice on top.
 
 ### 9. How does it work without internet?
 
@@ -162,16 +171,18 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 
 ### 11. What does the kit cost and who pays?
 
-- About **₹7,900** per kit (ESP32, 4 sensors, 2 gas sensors, fan, solar, enclosure).
+- **PoC bench build:** ₹11,500.
+- **Field kit v2:** ≈ **₹17,000 for a 25 t chawl, including fans**, so ≈ **₹700 per tonne** (approximate, Nov 2026). It scales: 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k.
 - Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at ₹15/kg is about ₹75,000 in one season. **This is a target, to be measured in the pilot.**
-- **Who pays:**
-  - Government: add the kit to the existing onion-storage (kanda chawl) subsidy schemes, so every new subsidised shed is also smart.
-  - FPOs: buy kits for their members and use the dashboard to plan collective selling.
-  - Farmers: a small yearly service fee for messages.
+- **Who pays** (details in `docs/BUSINESS.md`; all proposals, not yet validated):
+  - **FPOs, pay-per-tonne:** the FPO installs kits in member chawls and charges per tonne stored per season. The fee will be set from pilot data.
+  - **Government:** a retrofit component under the MIDH onion-storage subsidy (scheme rules still to be checked against the GR), and condition monitoring of Government buffer stocks.
+  - **Lenders:** verified stock data for warehouse-receipt credit.
 
 ### 12. What about competitors?
 
 - Some startups monitor storage temperature and humidity, mostly for warehouses and cold stores, using app dashboards.
+- **Godaam:** about **₹1,000–2,000 per tonne**, for **sensing only** (Kisan of India, Krishi Jagran; to verify before quoting). Our field kit is ≈₹700/t *including* fans and automatic control.
 - **What's different about us:**
   1. sensors at three depths inside the onion heap, plus rot gas;
   2. a **decision** (Hold/Sort/Sell) using the live Government price, not just a graph;
@@ -197,13 +208,14 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 
 Yes. The same kit and software work for anything stored in heaps or sacks that rots from moisture and heat: **potato, garlic, ginger, grain**. Only the thresholds and the gas baseline change. Government buffer-stock warehouses (NAFED and similar) are another market.
 
-### 16. What will you do with the ₹10 lakh?
+### 16. What will you do with the funding? (pilot budget ₹9.7 lakh)
 
-1. Build 100 kits: 80 pilot sheds plus spares.
+1. Build field kits for **40 pilot chawls**.
 2. Install them in Niphad–Lasalgaon, Nashik with one onion FPO and the Agriculture Department (MSAMB).
-3. Pay for one rabi storage season of SMS and voice calls.
-4. Weigh every shed at loading and emptying (80 with the kit, 20 without) to **measure the actual loss reduction**.
-5. Use that data to train the ML model.
+3. Pick **20 control chawls** with no kit, in the same villages.
+4. Pay for one rabi storage season of SMS and voice calls.
+5. Weigh every chawl at loading and emptying (40 with the kit, 20 without) to **measure the actual loss reduction**.
+6. Use that data to calibrate the rules and train the ML model.
 
 ### 17. What challenges did you face?
 
@@ -219,6 +231,9 @@ Yes. The same kit and software work for anything stored in heaps or sacks that r
 - "It saves 50% loss." That's a pilot target, not a result.
 - "Tested in farms." It isn't yet.
 - "We use AI translation." We use fixed Marathi templates.
+- "Our kit cut loss to 14.52 %." That is **NHRDF's** fan-store result, not ours.
+- "The demo uses the dew-point rule." The demo runs the **v1** rule; dew-point is v2.
+- "Our gas sensors tell rot from sprouting." That's the v2 design, backed by **lab** studies only.
 
 ## 30-second live demo order during the pitch
 

@@ -22,5 +22,6 @@ Status column: **verified** = we read the primary source; **to verify** = second
 | GC-IMS volatile profiles distinguish rotting from healthy stored onions | jury Q&A (sulphur confirms rot) | University of Warwick, *J. Agric. Food Chem.*, 2024 | Lab | to verify (add DOI) |
 | Bulk onion storage airflow 1–2 m³/min per m³ of onions | HARDWARE.md field kit fan sizing | UC Davis Postharvest / Oregon State University Extension storage guides | Extension guideline | to verify (add links) |
 | MIDH 2025-26 onion storage structure subsidy | BUSINESS.md (MIDH retrofit component) | Agrowon, Apr 2025 | News | **to verify against the Govt GR** before quoting amounts |
-| Godaam (competitor) pricing | BUSINESS.md, jury Q&A | Kisan of India; Krishi Jagran | News | to verify (add links + dates) |
+| Godaam (competitor) ≈ ₹1,000–2,000 per tonne, sensing only | BUSINESS.md, JURY_PREP §12 | Kisan of India; Krishi Jagran | News | to verify (add links + dates) |
+| Pilot budget ₹9.7 lakh for 40 kit + 20 control chawls | JURY_PREP §16, deck | our pilot budget | Our estimate | add the line-item budget sheet |
 | PoC bench kit ₹11,500; field kit ≈ ₹17,000 for 25 t (≈ ₹700/t); 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k | README, HARDWARE.md, deck | our BOM, approximate retail prices Nov 2026 | Our estimate | estimate, recheck at order time |
