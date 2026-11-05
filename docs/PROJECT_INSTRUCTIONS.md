@@ -39,7 +39,8 @@ Kanda Rakshak (कांदा रक्षक) is a retrofit kit for onion stor
 
 ### 5. Hardware safety
 - Never guess a pin, voltage or wire. Pin truth is `firmware/include/config.h`. If unsure, stop and ask.
-- Use a logic-level MOSFET (not IRF520), a flyback diode on the fan, divide the MQ analog outputs down to ≤3.3 V, and set the buck converter to 5.0 V before connecting anything.
+- Fan switching: Use a logic-level MOSFET or a relay module verified at 3.3 V (bench tests B9 + B10), with flyback diode and 10 kΩ pull-down on the input. Never IRF520.
+- Divide the MQ analog outputs down to ≤3.3 V, and set the buck converter to 5.0 V before connecting anything.
 - Every firmware change compiles (`pio run`) before commit and is checked by the hardware-safety reviewer.
 
 ## Engineering standards
