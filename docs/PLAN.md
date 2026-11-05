@@ -77,11 +77,11 @@ Use agents explicitly when needed: "use the firmware-engineer agent to …", "/r
 ### Day 4 — Fri 23 Oct — **Gate G2: hardware on the bench**
 | Who | Task |
 |---|---|
-| S | Wire step by step (HARDWARE.md §4), test each block alone with `pio run -t upload` and serial monitor: DHT22 ×4 → MQ-135/136 (start the 24–48 h burn-in tonight, leave powered) → MOSFET + fan. |
+| S | Wire step by step (HARDWARE.md §A5), test each block alone with `pio run -t upload` and serial monitor: DHT22 ×4 → MQ-135/136 (start the 24–48 h burn-in tonight, leave powered) → relay + fan. |
 | S | Flip `FAN_TEST` in serial: fan on/off from command. |
 | A | Pair with S on firmware: WiFi + POST to backend on the laptop's LAN IP. |
 
-**G2 exit:** all 4 DHT22 valid on serial · both MQ readings change when you breathe on / bring a cut onion near them · fan switches via MOSFET · `hardware-safety-reviewer` PASS · device posts to backend.
+**G2 exit:** all 4 DHT22 valid on serial · both MQ readings change when you breathe on / bring a cut onion near them · fan switches via relay (B9 + B10 pass) · `hardware-safety-reviewer` PASS · device posts to backend.
 
 ### Day 5–6 — Sat 24 – Sun 25 Oct — **Gate G3: real end-to-end loop**
 | Who | Task |
