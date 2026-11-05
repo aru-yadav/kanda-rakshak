@@ -14,7 +14,7 @@ Owner: Sarvejeet (run) · Aryan (export + write-up). Do not change thresholds du
 | B6 | Fan auto | wet cloth near TOP probe (RH > 78 %) with drier ambient → fan ON after rule | video |
 | B7 | Offline autonomy | stop backend + WiFi off → B6 still works; serial shows queue growing; restart → queue flushes | video + log |
 | B8 | Brown-out | fan + both heaters on together for 10 min, no ESP32 resets | serial log |
-| B9 | Relay at 3.3 V logic | jumper on H: `fan on` / `fan off` from serial switches the relay reliably 20 times in a row. If not, drive IN through a 2N2222/BC547 or use a 3.3 V-trigger relay module, then repeat | video + note of the fix used |
+| B9 | Relay at 3.3 V logic | **Step 0, before connecting IN to the ESP32:** check the trigger jumper is on **H**, and with the relay module powered and the ESP32 unplugged, IN reads **0 V** on the multimeter (no back-feed into GPIO 26). Then, jumper on H: `fan on` / `fan off` from serial switches the relay reliably 20 times in a row. If not, drive IN through a 2N2222/BC547 or use a 3.3 V-trigger relay module, then repeat | video + note of the fix used |
 | B10 | Fan OFF at boot | press EN 10 times and power-cycle 5 times: the fan never starts during boot (10 kΩ IN pull-down fitted) | video |
 
 ## B. Fresh vs rot experiment (Day 6–8)
