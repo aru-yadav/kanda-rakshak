@@ -17,7 +17,21 @@ Pin truth: `firmware/include/config.h`. This file must match it.
 
 ![PoC circuit](wiring-poc.png)
 
-`wiring-poc.png` (Cirkit Designer export). **Diagram TODO:** the drawing must also show the protection parts in §A2 (flyback diode across the fan, 1 A slow-blow fuse at relay COM, main 2 A fuse at adapter +, 10 kΩ pull-down on relay IN). Until it does, the text below is the build truth.
+`wiring-poc.png` (Cirkit Designer export, final PoC circuit, 5 Nov 2026).
+
+**What the diagram shows (checked against this file on 5 Nov 2026):** DHT22 DAT → GPIO 32 / 33 / 25 / 27 with VCC on 3V3; MQ-135 / MQ-136 AOUT → 12 kΩ → node → 10 kΩ → GND, nodes → GPIO 34 / 35; relay IN → GPIO 26, relay DC+ and MQ 5V from the LM2596 output rail, ESP32 fed on its 5V pin; COM fed from 12 V + through a fuse, NO → fan +; OLED SDA 21 / SCL 22 on 3V3; one common ground.
+
+**Where the diagram differs from this file (this file is the build truth):**
+- The 12 V source is drawn as a **battery**; on the bench we use the 12 V 2 A adapter. Wiring is the same.
+- **One fuse is drawn**, on the fan path (12 V + → relay COM), with no value. Fit **1 A slow-blow** there.
+- **Main 2 A fuse not drawn.** In the drawing the buck IN+ goes straight to 12 V +. Fit the 2 A fuse at adapter/battery + so it feeds everything, buck included.
+- **Flyback diode not drawn** (1N4007 / 1N5819 across the fan, stripe to fan +).
+- **10 kΩ pull-down on relay IN not drawn.**
+- Relay trigger jumper position is not shown; it must be on **H**.
+- The drawing does not label which DHT22 is TOP / MID / BOT / AMB. Use the pin map in §A4 and the B1 breath test.
+- Optional SCD41, BME688 and DS18B20 are not drawn.
+
+**Diagram TODO:** redraw with the 2 A main fuse, the 1 A value on the fan fuse, the flyback diode, the 10 kΩ pull-down, the jumper on H and the DHT position labels.
 
 ## A1. Summary
 
