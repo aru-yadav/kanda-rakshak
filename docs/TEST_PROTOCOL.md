@@ -8,12 +8,14 @@ Owner: Sarvejeet (run) · Aryan (export + write-up). Do not change thresholds du
 |---|---|---|---|
 | B1 | DHT label check | breathing on each probe raises only that probe's RH | photo + serial log |
 | B2 | Buck output | 5.00–5.05 V, no load | multimeter photo |
-| B3 | Divider node | < 3.3 V with sensor powered | multimeter photo |
+| B3 | Divider node (12k/10k) | < 2.5 V with sensor powered (expected max 2.27 V) | multimeter photo |
 | B4 | MQ response | cut onion near pod → MQ mV rises within 60 s | serial log |
 | B5 | Fan manual | `fan on` / `fan off` from serial | video |
 | B6 | Fan auto | wet cloth near TOP probe (RH > 78 %) with drier ambient → fan ON after rule | video |
 | B7 | Offline autonomy | stop backend + WiFi off → B6 still works; serial shows queue growing; restart → queue flushes | video + log |
 | B8 | Brown-out | fan + both heaters on together for 10 min, no ESP32 resets | serial log |
+| B9 | Relay at 3.3 V logic | jumper on H: `fan on` / `fan off` from serial switches the relay reliably 20 times in a row. If not, drive IN through a 2N2222/BC547 or use a 3.3 V-trigger relay module, then repeat | video + note of the fix used |
+| B10 | Fan OFF at boot | press EN 10 times and power-cycle 5 times: the fan never starts during boot (10 kΩ IN pull-down fitted) | video |
 
 ## B. Fresh vs rot experiment (Day 6–8)
 - Two crates, same room, same height, out of direct sun. Crate F = 2 kg fresh dry onions. Crate R = 2 kg onions bruised on Day 1 and kept humid.
