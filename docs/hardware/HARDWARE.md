@@ -212,8 +212,39 @@ Status: **designed, not built.** Prices approximate, Nov 2026.
 | Network | **A7670C** 4G/2G modem on UART2 | **Its own 4 V / 2 A buck** (2 A transmit bursts); never powered from the 3.3 V or 5 V logic rail |
 | Power | Fans on **grid**; **10–20 W solar** + battery for the electronics | Through a power cut, the electronics keep sensing, logging and deciding. The **fans can't run** until the grid returns. Main fuse at **battery +** |
 
+### Field kit BOM (25 t chawl, approximate, Nov 2026)
+
+| Item | ≈ ₹ |
+|---|---|
+| ESP32-C3/S3 board | 300 |
+| SCD41 CO₂ sensor | 2,100 |
+| 4 × SHT40 + PTFE caps | 1,400 |
+| 8 × DS18B20 string | 700 |
+| Probe tubes | 400 |
+| A7670C 4G modem | 1,700 |
+| Electronics solar + LiFePO₄ | 2,500 |
+| SSR / MOSFET switching | 800 |
+| 2–3 × 300 mm fans | 6,000 |
+| IP65 box, PCB, surge protection | 1,500 |
+| **Total** | **≈ 17,400** (quoted as ≈ ₹17,000, ≈ ₹700/t) |
+
+Not itemised yet: the **BME688** sulphur sensor (or MQ-136 on grid power) and the TCA9548A mux. Add them when the parts are quoted.
+
+### Pilot budget (40 kit + 20 control chawls)
+
+| Item | ₹ lakh |
+|---|---|
+| 40 kits × ₹17,000 | 6.80 |
+| Install + training | 0.30 |
+| SIM / IVR / cloud, 8 months | 0.45 |
+| Weigh-in / weigh-out audit, 60 chawls | 0.45 |
+| Spares | 0.25 |
+| Subtotal | 8.25 |
+| GST 18 % | 1.49 |
+| **Total** | **9.74** (quoted as ₹9.7 lakh) |
+
 **Mains safety (open decision: fan voltage).** A grid-powered 300 mm fan is usually **230 V AC**, and that means mains in a damp shed, which v1 avoided (see TECH_STACK.md). Choose one before building:
-- **12/24 V DC fans** from a grid power supply (keeps mains out of the shed), or
+- **12/24 V DC fans** from a grid power supply (**preferred**: keeps mains out of the shed), or
 - **230 V AC fans**, installed by a licensed electrician, with: a 30 mA RCD/RCCB, a proper earth, a correctly rated SSR with its own fuse, an IP65 enclosure for every mains part, and no mains wiring inside the heap.
 This must pass `hardware-safety-reviewer` and a human electrician before any field install.
 

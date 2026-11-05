@@ -173,7 +173,8 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 
 - **PoC bench build:** ₹11,500.
 - **Field kit v2:** ≈ **₹17,000 for a 25 t chawl, including fans**, so ≈ **₹700 per tonne** (approximate, Nov 2026). It scales: 5 t ≈ ₹9–10k, 100 t ≈ ₹45–65k.
-- Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at an **assumed ₹15/kg** is about ₹75,000 in one season (price assumption, see EVIDENCE.md; use the live Agmarknet price on the day). **This is a target, to be measured in the pilot.**
+- Our pilot target is to cut loss from about 40% to 20% or less. On a 25-tonne shed, saving 5 t of onion at an **assumed ₹15/kg** is about ₹75,000 in one season (price assumption, see EVIDENCE.md; use the live Agmarknet price on the day). **This is a target, to be measured in the pilot.** Target payback: **< 1 season**.
+- For scale: the kit is **≈7% of a 25 t chawl's cost norm** (25 t × ₹10,000/t MIDH cost norm = ₹2.5 lakh; ₹17,000 / ₹2.5 lakh ≈ 6.8 %). The MIDH figure is as reported by Agrowon, Apr 2025; verify it against the GR.
 - **Who pays** (details in `docs/BUSINESS.md`; all proposals, not yet validated):
   - **FPOs, pay-per-tonne:** the FPO installs kits in member chawls and charges per tonne stored per season. The fee will be set from pilot data.
   - **Government:** a retrofit component under the MIDH onion-storage subsidy (scheme rules still to be checked against the GR), and condition monitoring of Government buffer stocks.
@@ -182,7 +183,7 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 ### 12. What about competitors?
 
 - Some startups monitor storage temperature and humidity, mostly for warehouses and cold stores, using app dashboards.
-- **Godaam:** about **₹1,000–2,000 per tonne**, for **sensing only** (Kisan of India, Krishi Jagran; to verify before quoting, including whether it is a one-time price or a per-season fee). Don't compare it with our ≈₹700/t hardware cost until the units match.
+- **Godaam:** Godaam Sense is reported at **₹10,000 per device covering ~5–10 t** (Kisan of India / Krishi Jagran; may include service). It is sensing only, with no fan control. Don't quote a per-tonne comparison with our kit as a hard claim.
 - **What's different about us:**
   1. sensors at three depths inside the onion heap, plus rot gas;
   2. a **decision** (Hold/Sort/Sell) using the live Government price, not just a graph;
@@ -209,6 +210,9 @@ Rot usually starts at the **bottom and middle**, where air moves least and moist
 Yes. The same kit and software work for anything stored in heaps or sacks that rots from moisture and heat: **potato, garlic, ginger, grain**. Only the thresholds and the gas baseline change. Government buffer-stock warehouses (NAFED and similar) are another market.
 
 ### 16. What will you do with the funding? (pilot budget ₹9.7 lakh)
+
+Breakdown (also on deck slide 4 and in HARDWARE.md): 40 kits ₹6.80 L · install + training ₹0.30 L · SIM/IVR/cloud 8 months ₹0.45 L · weigh-in/out audit for 60 chawls ₹0.45 L · spares ₹0.25 L = ₹8.25 L + GST 18 % ₹1.49 L = **₹9.74 L**.
+
 
 1. Build field kits for **40 pilot chawls**.
 2. Install them in Niphad–Lasalgaon, Nashik with one onion FPO and the Agriculture Department (MSAMB).
