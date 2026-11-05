@@ -20,7 +20,7 @@
 #define MQ_DIVIDER_RATIO 1.5f // Vsensor = Vpin * (10k+20k)/20k
 
 // ---- Fan via 5 V relay module (JQC-3F-T73), jumper on H: HIGH = fan ON ----
-// COM = 12 V+ through 5 A fuse, NO = fan +. Boots LOW = relay open = fan OFF.
+// COM = 12 V+ through 1 A slow-blow fuse, NO = fan +. Boots LOW = relay open = fan OFF.
 #define PIN_FAN          26
 #define PIN_LED          2    // onboard LED
 
